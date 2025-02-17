@@ -3,34 +3,27 @@ import { MapData } from './types';
 const getSystemPrompt = () => {
   return `You are a D3.js map visualization expert. Create map visualizations based on the user's request.
 
-For each region mentioned, use these EXACT property mappings:
+AVAILABLE GEOJSON FILES AND THEIR FIELDS:
+1. countries.geojson:
+   - Field "NAME": Full country name
+   - Field "ISO_A3": 3-letter ISO code (e.g. USA, GBR)
+   - Example: { "properties": { "NAME": "United States", "ISO_A3": "USA" } }
 
-FOR WORLD MAPS (countries):
-- Use the ISO3 codes from countries.geojson
-- Example country codes: USA, GBR, FRA, DEU, JPN, etc.
-- Region properties structure in geojson:
-  {
-    "properties": {
-      "name": "United States",
-      "iso_a3": "USA"
-    }
-  }
+2. US_states.geojson:
+   - Field "name": Full state name
+   - Field "postal": 2-letter postal code (e.g. CA, NY)
+   - Example: { "properties": { "name": "California", "postal": "CA" } }
 
-FOR US MAPS (states):
-- Use 2-letter postal codes from US_states.geojson
-- Example state codes: CA, NY, TX, FL, etc.
-- Region properties structure in geojson:
-  {
-    "properties": {
-      "name": "California",
-      "postal": "CA"
-    }
-  }
+3. Boundary files:
+   - country_bounds.geojson: World boundaries
+   - US_bounds.geojson: US state boundaries
 
 COLOR PREFERENCES:
-- Default fill color should be "#edded1" unless specified
-- Default border color should be "#ffffff"
-- Colors should be gentle pastels, relatively unsaturated but still diffentiable by uhhh whatever would look good in 1977 Sunset mag
+- Default fill color: "#edded1"
+- Default border color: "#ffffff"
+- Use gentle pastels, relatively unsaturated
+- Think 1977 Sunset Magazine aesthetic
+- Aim for colors that are distinguishable but harmonious
 
 RESPOND ONLY WITH A VALID JSON OBJECT. NO OTHER TEXT OR FORMATTING.
 
@@ -39,8 +32,8 @@ The JSON must follow this format:
   "mapType": "world" | "us",
   "states": [
     {
-      "state": "Full Name (e.g. 'California' or 'United States')",
-      "postalCode": "Exact code from geojson (e.g. 'CA' or 'USA')",
+      "state": "Full Name",
+      "postalCode": "ISO_A3 or postal code",
       "label": "Display Name"
     }
   ],
@@ -49,12 +42,8 @@ The JSON must follow this format:
     "postalCode": "#hexColor"
   },
   "borderColor": "#hexColor",
-  "showLabels": true
-}
-
-Examples:
-For US: { "state": "California", "postalCode": "CA", "label": "California" }
-For World: { "state": "United States", "postalCode": "USA", "label": "United States" }`;
+  "showLabels": boolean
+}`;
 };
 
 const validateResponse = (jsonResponse: any): { isValid: boolean; issues: string[] } => {
@@ -102,14 +91,12 @@ const validateResponse = (jsonResponse: any): { isValid: boolean; issues: string
 
   // Validate postal codes based on map type
   const isValidPostalCode = (code: string, mapType: string) => {
-    if (mapType === 'us') {
-      return /^[A-Z]{2}$/.test(code);
-    }
-    return /^[A-Z]{3}$/.test(code);
+    return mapType === 'us' ? /^[A-Z]{2}$/.test(code) : /^[A-Z]{3}$/.test(code);
   };
 
   const hasValidPostalCodes = jsonResponse.states.every((state: any) =>
-    isValidPostalCode(state.postalCode, jsonResponse.mapType)
+    state.postalCode && typeof state.postalCode === 'string' && 
+    (isValidPostalCode(state.postalCode, 'us') || isValidPostalCode(state.postalCode, 'world'))
   );
 
   if (!hasValidPostalCodes) {

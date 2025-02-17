@@ -12,19 +12,9 @@ export async function generateD3Bundle(data: MapData, geojsonData: any): Promise
 
   // Core visualization code
   const visualizationCode = `
-const renderMap = async (config, geojsonPath) => {
+const renderMap = async (config) => {
   const width = 960;
   const height = 600;
-  const isUSMap = config.mapType === 'us';
-
-  // Load GeoJSON data
-  const [regionsResponse, boundsResponse] = await Promise.all([
-    fetch(isUSMap ? 'data/US_states.geojson' : 'data/countries.geojson'),
-    fetch(isUSMap ? 'data/US_bounds.geojson' : 'data/country_bounds.geojson')
-  ]);
-
-  const regions = await regionsResponse.json();
-  const bounds = await boundsResponse.json();
 
   const svg = d3.select("#map")
     .append("svg")
@@ -34,70 +24,71 @@ const renderMap = async (config, geojsonPath) => {
     .attr("style", "max-width: 100%; height: auto;")
     .style("background-color", "#F9F5F1");
 
-  const projection = isUSMap 
-    ? d3.geoAlbersUsa().scale(1000).translate([width / 2, height / 2])
-    : d3.geoEqualEarth().scale(180).translate([width / 2, height / 2]);
+  const projection = config.mapType === 'us'
+    ? d3.geoAlbersUsa()
+        .scale(1300)
+        .translate([487.5, 305])
+    : d3.geoEqualEarth()
+        .scale(180)
+        .translate([width / 2, height / 2]);
 
   const path = d3.geoPath().projection(projection);
 
-  const tooltip = d3.select("body")
-    .append("div")
-    .attr("class", "tooltip");
+  // Load all data
+  const [countries, countryBounds, states, stateBounds] = await Promise.all([
+    fetch('data/countries.geojson').then(r => r.json()),
+    fetch('data/country_bounds.geojson').then(r => r.json()),
+    fetch('data/US_states.geojson').then(r => r.json()),
+    fetch('data/US_bounds.geojson').then(r => r.json())
+  ]);
 
-  // Draw regions
+  // Draw countries first
   svg.append("g")
     .selectAll("path")
-    .data(regions.features)
+    .data(countries.features)
     .join("path")
     .attr("d", path)
     .attr("fill", (d) => {
-      const code = isUSMap 
-        ? d.properties?.postal 
-        : (d.properties?.ISO_A3 || d.properties?.iso_a3);
-      return config.highlightColors?.[code] || config.defaultFill || "#f3f3f3";
-    })
-    .attr("stroke", "none")
-    .style("cursor", "pointer")
-    .on("mouseover", (event, d) => {
-      const name = d.properties?.NAME || d.properties?.name || 'Unknown';
-      const code = isUSMap 
-        ? d.properties?.postal 
-        : (d.properties?.ISO_A3 || d.properties?.iso_a3 || 'Unknown');
-      tooltip.style("visibility", "visible")
-        .html("<strong>" + name + "</strong> (" + code + ")");
-    })
-    .on("mousemove", (event) => {
-      tooltip.style("top", (event.pageY - 10) + "px")
-        .style("left", (event.pageX + 10) + "px");
-    })
-    .on("mouseout", () => tooltip.style("visibility", "hidden"));
+      const code = d.properties?.ISO_A3 || d.properties?.iso_a3;
+      return config.highlightColors?.[code] || config.defaultFill || "#edded1";
+    });
 
-  // Draw bounds
-  svg.append("path")
-    .datum(bounds)
+  // Draw states on top
+  svg.append("g")
+    .selectAll("path")
+    .data(states.features)
+    .join("path")
+    .attr("d", path)
+    .attr("fill", (d) => {
+      const code = d.properties?.postal;
+      return config.highlightColors?.[code] || config.defaultFill || "#edded1";
+    });
+
+  // Draw all boundaries
+  svg.append("g")
+    .selectAll("path")
+    .data([...countryBounds.features, ...stateBounds.features])
+    .join("path")
     .attr("d", path)
     .attr("fill", "none")
-    .attr("stroke", "#F9F5F1")
-    .attr("stroke-width", "1");
+    .attr("stroke", "#ffffff")
+    .attr("stroke-width", "1px");
 
-  // Add labels
+  // Add labels if enabled
   if (config.showLabels) {
     svg.append("g")
       .selectAll("text")
-      .data(regions.features)
+      .data([...countries.features, ...states.features])
       .join("text")
       .attr("transform", (d) => {
         const centroid = path.centroid(d);
-        if (isNaN(centroid[0]) || isNaN(centroid[1])) return null;
-        return "translate(" + centroid[0] + "," + centroid[1] + ")";
+        return centroid ? \`translate(\${centroid[0]},\${centroid[1]})\` : "";
       })
       .attr("text-anchor", "middle")
       .attr("dy", ".35em")
       .text((d) => {
-        const code = isUSMap 
-          ? d.properties?.postal 
-          : (d.properties?.ISO_A3 || d.properties?.iso_a3);
-        const name = isUSMap ? code : (d.properties?.NAME || d.properties?.name || code);
+        const code = d.properties?.ISO_A3 || d.properties?.iso_a3 || d.properties?.postal;
+        const name = d.properties?.NAME || d.properties?.name || code;
         return config.highlightColors?.[code] ? name : "";
       })
       .attr("fill", "#000000")
@@ -105,6 +96,29 @@ const renderMap = async (config, geojsonPath) => {
       .attr("font-weight", "bold")
       .style("pointer-events", "none");
   }
+
+  // Add tooltips
+  const tooltip = d3.select("body")
+    .append("div")
+    .attr("class", "tooltip");
+
+  svg.selectAll("path")
+    .on("mouseover", (event, d) => {
+      const name = d.properties?.NAME || d.properties?.name || 'Unknown';
+      const code = d.properties?.ISO_A3 || d.properties?.iso_a3 || d.properties?.postal || 'Unknown';
+      
+      tooltip
+        .style("visibility", "visible")
+        .html(\`\${name} (\${code})\`);
+    })
+    .on("mousemove", (event) => {
+      tooltip
+        .style("top", (event.pageY - 10) + "px")
+        .style("left", (event.pageX + 10) + "px");
+    })
+    .on("mouseout", () => {
+      tooltip.style("visibility", "hidden");
+    });
 };`;
 
   // HTML template
@@ -158,14 +172,11 @@ body {
   cssDir?.file("styles.css", css);
   srcDir?.file("visualization.js", visualizationCode);
 
-  // Split the combined geojsonData into separate files
-  if (data.mapType === 'us') {
-    dataDir?.file('US_states.geojson', JSON.stringify(geojsonData.regions, null, 2));
-    dataDir?.file('US_bounds.geojson', JSON.stringify(geojsonData.bounds, null, 2));
-  } else {
-    dataDir?.file('countries.geojson', JSON.stringify(geojsonData.regions, null, 2));
-    dataDir?.file('country_bounds.geojson', JSON.stringify(geojsonData.bounds, null, 2));
-  }
+  // Always include all datasets
+  dataDir?.file('countries.geojson', JSON.stringify(geojsonData.countries, null, 2));
+  dataDir?.file('country_bounds.geojson', JSON.stringify(geojsonData.countryBounds, null, 2));
+  dataDir?.file('US_states.geojson', JSON.stringify(geojsonData.states, null, 2));
+  dataDir?.file('US_bounds.geojson', JSON.stringify(geojsonData.stateBounds, null, 2));
 
   // Add documentation
   zip.file("README.md", `# D3.js Map Visualization Bundle

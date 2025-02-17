@@ -11,7 +11,7 @@ interface MapVisualizationProps {
 const MapVisualization = ({ data }: MapVisualizationProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [geoData, setGeoData] = useState<{ regions: any; bounds: any } | null>(null);
+  const [geoData, setGeoData] = useState<{ countries: any; countryBounds: any; states: any; stateBounds: any } | null>(null);
   const { toast } = useToast();
 
   const handleExport = async (type: string) => {
@@ -61,50 +61,55 @@ const MapVisualization = ({ data }: MapVisualizationProps) => {
 
         const projection = isUSMap 
           ? d3.geoAlbersUsa()
-              .scale(1000)
-              .translate([width / 2, height / 2])
+              .scale(1300)
+              .translate([487.5, 305])
           : d3.geoEqualEarth()
               .scale(180)
               .translate([width / 2, height / 2]);
 
         const path = d3.geoPath().projection(projection);
 
-        const dataPromise = isUSMap
-          ? Promise.all([
-              d3.json("/geojson/US_states.geojson"),
-              d3.json("/geojson/US_bounds.geojson")
-            ])
-          : Promise.all([
-              d3.json("/geojson/countries.geojson"),
-              d3.json("/geojson/country_bounds.geojson")
-            ]);
+        // Always load both datasets to handle mixed queries
+        const dataPromise = Promise.all([
+          d3.json("/geojson/countries.geojson"),
+          d3.json("/geojson/country_bounds.geojson"),
+          d3.json("/geojson/US_states.geojson"),
+          d3.json("/geojson/US_bounds.geojson")
+        ]);
 
-        const [regions, bounds] = await dataPromise;
-        setGeoData({ regions, bounds });
-        console.log('First region feature:', regions.features[0]);
+        const [countries, countryBounds, states, stateBounds] = await dataPromise;
+        setGeoData({ countries, countryBounds, states, stateBounds });
+        console.log('First region feature:', countries.features[0]);
         
         // Draw regions - STRICTLY NO STROKE
+        // First draw countries
         svg.append("g")
           .selectAll("path")
-          .data(regions.features)
+          .data(countries.features)
           .join("path")
           .attr("d", path)
           .attr("fill", (d: any) => {
-            const code = isUSMap 
-              ? d.properties?.postal 
-              : (d.properties?.ISO_A3 || d.properties?.iso_a3);
-              
-            console.log('Region code:', code, 'Has highlight?:', !!data.highlightColors?.[code]);
-            
-            if (data.highlightColors?.[code]) {
-              return data.highlightColors[code];
-            }
-            return data.defaultFill || "#f3f3f3";
+            const code = d.properties?.ISO_A3 || d.properties?.iso_a3;
+            return data.highlightColors?.[code] || data.defaultFill || "#edded1";
+          });
+
+        // Then draw states on top
+        svg.append("g")
+          .selectAll("path")
+          .data(states.features)
+          .join("path")
+          .attr("d", path)
+          .attr("fill", (d: any) => {
+            const code = d.properties?.postal;
+            return data.highlightColors?.[code] || data.defaultFill || "#edded1";
           });
 
         // Draw bounds - STRICTLY 1PX WHITE STROKE
-        svg.append("path")
-          .datum(bounds)
+        svg.append("g")
+          .selectAll("path")
+          .data([...countryBounds.features, ...stateBounds.features])
+          .join("path")
+          .datum((d: any) => d)
           .attr("d", path)
           .attr("fill", "none")
           .attr("stroke", "#F9F5F1")
@@ -115,7 +120,7 @@ const MapVisualization = ({ data }: MapVisualizationProps) => {
           console.log('Adding labels...');
           svg.append("g")
             .selectAll("text")
-            .data(regions.features)
+            .data([...countries.features, ...states.features])
             .join("text")
             .attr("transform", (d: any) => {
               const centroid = path.centroid(d);
@@ -129,11 +134,8 @@ const MapVisualization = ({ data }: MapVisualizationProps) => {
             .attr("text-anchor", "middle")
             .attr("dy", ".35em")
             .text((d: any) => {
-              const code = isUSMap 
-                ? d.properties?.postal 
-                : (d.properties?.ISO_A3 || d.properties?.iso_a3);
-              
-              const name = isUSMap ? code : (d.properties?.NAME || d.properties?.name || code);
+              const code = d.properties?.ISO_A3 || d.properties?.iso_a3 || d.properties?.postal;
+              const name = d.properties?.NAME || d.properties?.name || code;
               console.log('Label check:', { code, name, hasHighlight: !!data.highlightColors?.[code] });
               
               return data.highlightColors?.[code] ? name : "";
@@ -158,9 +160,7 @@ const MapVisualization = ({ data }: MapVisualizationProps) => {
         svg.selectAll("path")
           .on("mouseover", (event, d: any) => {
             const name = d.properties?.NAME || d.properties?.name || 'Unknown';
-            const code = isUSMap 
-              ? d.properties?.postal 
-              : (d.properties?.ISO_A3 || d.properties?.iso_a3 || 'Unknown');
+            const code = d.properties?.ISO_A3 || d.properties?.iso_a3 || d.properties?.postal || 'Unknown';
               
             tooltip
               .style("visibility", "visible")
