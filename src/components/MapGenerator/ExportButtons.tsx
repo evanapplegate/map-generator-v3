@@ -43,7 +43,7 @@ const ExportButtons = ({ onExport, mapData, geojsonData }: ExportButtonsProps) =
   };
 
   return (
-    <div className="space-x-4">
+    <div className="flex gap-2 justify-end mt-4">
       <Button
         variant="default"
         onClick={() => onExport('svg')}
@@ -59,14 +59,6 @@ const ExportButtons = ({ onExport, mapData, geojsonData }: ExportButtonsProps) =
       >
         <Download className="w-4 h-4" />
         Export D3 Bundle
-      </Button>
-      <Button
-        variant="outline"
-        onClick={() => onExport('pdf')}
-        className="flex items-center gap-2"
-      >
-        <Download className="w-4 h-4" />
-        Export PDF
       </Button>
     </div>
   );

@@ -178,11 +178,6 @@ const Index = () => {
                       Variation {index + 1}
                     </div>
                     <MapVisualization data={mapData} />
-                    <div className="flex justify-end mt-4">
-                      <Button onClick={() => handleExport('svg', index)}>
-                        Export SVG
-                      </Button>
-                    </div>
                   </div>
                 ))}
               </div>
