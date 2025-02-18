@@ -52,6 +52,14 @@ The JSON must follow this format:
   "showLabels": boolean
 }`;
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000;
+
+/**
+ * Sleep for specified milliseconds
+ */
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
 /**
  * Generate map data using Claude API
  * @param {string} description - User's map description
@@ -61,62 +69,93 @@ The JSON must follow this format:
 export async function generateMapData(description, apiKey) {
     log('CLAUDE', 'Generating map data', { description });
     
-    try {
-        const response = await fetch('/api/claude', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                description,
-                apiKey,
-                system: SYSTEM_PROMPT
-            })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            log('CLAUDE', 'API error', error);
-            throw new Error(`Claude API error: ${error.error?.message || 'Unknown error'}`);
-        }
-        
-        const data = await response.json();
-        log('CLAUDE', 'Received response', data);
-        
-        // Extract content from Claude's response
-        const content = data.content[0].text;
-        
-        // Parse JSON from content
-        const mapData = JSON.parse(content);
-        
-        // Validate response structure
-        if (!mapData.mapType || !mapData.states) {
-            throw new Error('Invalid response structure from Claude');
-        }
-        
-        if (!['us', 'world'].includes(mapData.mapType)) {
-            throw new Error('Invalid map type from Claude');
-        }
-        
-        if (!Array.isArray(mapData.states)) {
-            throw new Error('States must be an array');
-        }
-        
-        for (const state of mapData.states) {
-            if (!state.state || !state.postalCode || !state.label) {
-                throw new Error('Missing required state fields');
+    let lastError;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const response = await fetch('/api/claude', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    description,
+                    apiKey,
+                    system: SYSTEM_PROMPT
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API request failed: ${response.status}`);
             }
+            
+            const data = await response.json();
+            
+            // Extract content from Claude's response
+            try {
+                const content = data.content[0].text;
+                const mapData = JSON.parse(content);
+                
+                // Validate response structure
+                if (!mapData.mapType || !mapData.states) {
+                    throw new Error('Invalid response structure from Claude');
+                }
+                
+                if (!['us', 'world'].includes(mapData.mapType)) {
+                    throw new Error('Invalid map type from Claude');
+                }
+                
+                if (!Array.isArray(mapData.states)) {
+                    throw new Error('States must be an array');
+                }
+                
+                for (const state of mapData.states) {
+                    if (!state.state || !state.postalCode || !state.label) {
+                        throw new Error('Missing required state fields');
+                    }
+                }
+                
+                if (!mapData.defaultFill || !mapData.highlightColors || !mapData.borderColor) {
+                    throw new Error('Missing required color fields');
+                }
+                
+                log('CLAUDE', 'Validated map data', mapData);
+                
+                // Force showLabels to true
+                mapData.showLabels = true;
+                
+                return mapData;
+                
+            } catch (parseError) {
+                log('CLAUDE', 'JSON parse error', { 
+                    error: parseError.message,
+                    content: data.content[0].text,
+                    attempt 
+                });
+                
+                if (attempt === MAX_RETRIES) {
+                    throw new Error(`Failed to parse Claude's response after ${MAX_RETRIES} attempts: ${parseError.message}`);
+                }
+                
+                // Wait before retrying
+                await sleep(RETRY_DELAY);
+                continue;
+            }
+            
+        } catch (error) {
+            lastError = error;
+            log('CLAUDE', 'Request error', { 
+                error: error.message,
+                attempt 
+            });
+            
+            if (attempt === MAX_RETRIES) {
+                throw new Error(`Failed after ${MAX_RETRIES} attempts: ${error.message}`);
+            }
+            
+            // Wait before retrying
+            await sleep(RETRY_DELAY);
         }
-        
-        if (!mapData.defaultFill || !mapData.highlightColors || !mapData.borderColor) {
-            throw new Error('Missing required color fields');
-        }
-        
-        log('CLAUDE', 'Validated map data', mapData);
-        return mapData;
-        
-    } catch (error) {
-        log('CLAUDE', 'Error generating map data', { error: error.message });
-        throw error;
     }
+    
+    throw lastError;
 }

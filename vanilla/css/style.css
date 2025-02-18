@@ -1,8 +1,9 @@
 body {
-    font-family: system-ui, -apple-system, sans-serif;
+    background-color: #F9F5F1;
+    color: #8d7a69;
+    font-family: Optima, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     margin: 0;
     padding: 20px;
-    background: #fafafa;
 }
 
 #app {
@@ -29,16 +30,22 @@ body {
 }
 
 button {
-    padding: 8px 16px;
-    background: #333;
+    background-color: #333;
     color: white;
     border: none;
+    padding: 10px 20px;
     border-radius: 4px;
     cursor: pointer;
+    font-family: inherit;
 }
 
 button:hover {
     background: #444;
+}
+
+button:disabled {
+    background-color: #666;
+    cursor: not-allowed;
 }
 
 #map-section {
@@ -58,4 +65,21 @@ button:hover {
     display: flex;
     gap: 10px;
     justify-content: flex-end;
+}
+
+textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+    color: inherit;
+    background-color: white;
+    min-height: 100px;
+    margin-bottom: 10px;
+}
+
+.loading {
+    opacity: 0.7;
+    pointer-events: none;
 }

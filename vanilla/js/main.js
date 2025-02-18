@@ -33,6 +33,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             log('APP', 'Starting map generation', { description });
             generateButton.disabled = true;
+            generateButton.textContent = 'Loading map...';
+            mapContainer.innerHTML = '';
+            exportSvgButton.disabled = true;
+            exportBundleButton.disabled = true;
             
             currentMapData = await generateMapData(description, apiKey);
             log('APP', 'Map data generated', { mapData: currentMapData });
@@ -48,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Error generating map: ' + error.message);
         } finally {
             generateButton.disabled = false;
+            generateButton.textContent = 'Generate Map';
         }
     });
     
@@ -91,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             log('APP', 'Starting bundle export');
             exportBundleButton.disabled = true;
+            exportBundleButton.textContent = 'Exporting bundle...';
             
             const blob = await exportBundle(currentMapData);
             log('APP', 'Bundle generated', {
@@ -113,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Error exporting bundle: ' + error.message);
         } finally {
             exportBundleButton.disabled = false;
+            exportBundleButton.textContent = 'Export Bundle';
         }
     });
     
