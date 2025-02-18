@@ -1,0 +1,122 @@
+import { log } from './logger.js';
+import { parseMapRequest } from './mapRequestParser.js';
+
+const SYSTEM_PROMPT = `You are a D3.js map visualization expert. Create map visualizations based on the user's request.
+
+AVAILABLE GEOJSON FILES AND THEIR FIELDS:
+1. countries.geojson:
+   - Field "NAME": Full country name
+   - Field "ISO_A3": 3-letter ISO code (e.g. USA, GBR)
+   - Example: { "properties": { "NAME": "United States", "ISO_A3": "USA" } }
+
+2. US_states.geojson:
+   - Field "name": Full state name
+   - Field "postal": 2-letter postal code (e.g. CA, NY)
+   - Example: { "properties": { "name": "California", "postal": "CA" } }
+
+3. Boundary files:
+   - country_bounds.geojson: World boundaries
+   - US_bounds.geojson: US state boundaries
+
+REGION HANDLING:
+- For world maps: Only include US states if explicitly mentioned
+- For US maps: Only include states, no countries
+- Example world map: "India in purple, france in teal"
+- Example world map with states: "world map, france in blue, texas in red"
+- Example US-only map: "california and nevada in green"
+
+COLOR PREFERENCES:
+- Default fill color: "#edded1"
+- Default border color: "#ffffff"
+- Use gentle pastels, relatively unsaturated
+- Think 1977 Sunset Magazine aesthetic
+- Aim for colors that are distinguishable but harmonious
+
+RESPOND ONLY WITH A VALID JSON OBJECT. NO OTHER TEXT OR FORMATTING.
+
+The JSON must follow this format:
+{
+  "mapType": "world" | "us",
+  "states": [
+    {
+      "state": "Full Name",
+      "postalCode": "ISO_A3 or postal code",
+      "label": "Display Name"
+    }
+  ],
+  "defaultFill": "#hexColor",
+  "highlightColors": {
+    "postalCode": "#hexColor"
+  },
+  "borderColor": "#hexColor",
+  "showLabels": boolean
+}`;
+
+/**
+ * Generate map data using Claude API
+ * @param {string} description - User's map description
+ * @param {string} apiKey - Claude API key
+ * @returns {Promise<Object>} Map configuration
+ */
+export async function generateMapData(description, apiKey) {
+    log('CLAUDE', 'Generating map data', { description });
+    
+    try {
+        const response = await fetch('/api/claude', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                description,
+                apiKey,
+                system: SYSTEM_PROMPT
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            log('CLAUDE', 'API error', error);
+            throw new Error(`Claude API error: ${error.error?.message || 'Unknown error'}`);
+        }
+        
+        const data = await response.json();
+        log('CLAUDE', 'Received response', data);
+        
+        // Extract content from Claude's response
+        const content = data.content[0].text;
+        
+        // Parse JSON from content
+        const mapData = JSON.parse(content);
+        
+        // Validate response structure
+        if (!mapData.mapType || !mapData.states) {
+            throw new Error('Invalid response structure from Claude');
+        }
+        
+        if (!['us', 'world'].includes(mapData.mapType)) {
+            throw new Error('Invalid map type from Claude');
+        }
+        
+        if (!Array.isArray(mapData.states)) {
+            throw new Error('States must be an array');
+        }
+        
+        for (const state of mapData.states) {
+            if (!state.state || !state.postalCode || !state.label) {
+                throw new Error('Missing required state fields');
+            }
+        }
+        
+        if (!mapData.defaultFill || !mapData.highlightColors || !mapData.borderColor) {
+            throw new Error('Missing required color fields');
+        }
+        
+        log('CLAUDE', 'Validated map data', mapData);
+        return mapData;
+        
+    } catch (error) {
+        log('CLAUDE', 'Error generating map data', { error: error.message });
+        throw error;
+    }
+}

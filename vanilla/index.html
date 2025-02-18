@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Generator</title>
+    <link rel="stylesheet" href="./css/style.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <div id="input-section">
+            <input type="password" id="api-key" placeholder="Enter Claude API Key">
+            <textarea id="map-description" placeholder="Describe your map (e.g. 'world map with Australia and the U.S. labeled, color them green')"></textarea>
+            <button id="generate">Generate Map</button>
+        </div>
+        
+        <div id="map-section">
+            <div id="map-container"></div>
+            <div id="export-buttons">
+                <button id="export-svg">Export SVG</button>
+                <button id="export-bundle">Export D3 Bundle</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core functionality modules -->
+    <script type="module" src="./js/types.js"></script>
+    <script type="module" src="./js/mapRequestParser.js"></script>
+    <script type="module" src="./js/llmMapGenerator.js"></script>
+    <script type="module" src="./js/mapVisualization.js"></script>
+    <script type="module" src="./js/exportD3Bundle.js"></script>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
