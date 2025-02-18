@@ -3,6 +3,7 @@
  */
 
 import { log } from './logger.js';
+import { currentMapData } from './main.js';
 
 /**
  * Load GeoJSON data
@@ -39,7 +40,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
         }
         #map { 
             width: 100%; 
-            height: 600px;
+            height: 800px;
             background: #F9F5F1;
             border-radius: 4px;
         }
@@ -72,12 +73,20 @@ const CSS = `
  * @param {MapData} config - Map configuration
  * @returns {string} JavaScript code
  */
-function generateVisualizationCode(config) {
-    return `// D3.js Map Visualization
-const width = document.getElementById('map').clientWidth;
-const height = document.getElementById('map').clientHeight;
+function generateVisualizationCode(mapData) {
+    return `
+// Initialize map
+const container = document.getElementById('map');
+const width = container.clientWidth;
+const height = container.clientHeight;
 const aspect = width / height;
 
+// Map data
+const highlightColors = ${JSON.stringify(mapData.highlightColors)};
+const defaultFill = '${mapData.defaultFill}';
+const mapType = '${mapData.mapType}';
+
+// Create SVG
 const svg = d3.select('#map')
     .append('svg')
     .attr('width', '100%')
@@ -91,97 +100,46 @@ const regionsLayer = svg.append('g').attr('id', 'regions-layer');
 const boundsLayer = svg.append('g').attr('id', 'bounds-layer');
 const labelsLayer = svg.append('g').attr('id', 'labels-layer');
 
-// Create projection
-const projection = '${config.mapType}' === 'us'
-    ? d3.geoAlbersUsa()
-        .scale(width * 1.3)
-        .translate([width / 2, height / 2])
-    : d3.geoEqualEarth()
-        .scale(Math.min(width / 6.5, height / 4))
-        .translate([width / 2, height / 2]);
-
-const path = d3.geoPath().projection(projection);
-
 // Create tooltip
 const tooltip = d3.select('body')
     .append('div')
-    .attr('class', 'tooltip')
-    .style('position', 'absolute')
-    .style('visibility', 'hidden')
-    .style('background-color', '#ffffff')
-    .style('padding', '10px')
-    .style('border-radius', '5px')
-    .style('box-shadow', '0 2px 4px rgba(0,0,0,0.1)');
+    .attr('class', 'tooltip');
 
-// Load required data
-const dataPromises = [];
-if ('${config.mapType}' === 'world') {
-    dataPromises.push(
-        d3.json('data/countries.geojson'),
-        d3.json('data/country_bounds.geojson')
-    );
-}
-
-// Only load states if it's a US map or if specific states are highlighted
-const hasHighlightedStates = ${JSON.stringify(config.states?.some(s => 
-    /^[A-Z]{2}$/.test(s.postalCode) && config.highlightColors?.[s.postalCode]
-))};
-
-if ('${config.mapType}' === 'us' || hasHighlightedStates) {
-    dataPromises.push(
-        d3.json('data/US_states.geojson'),
-        d3.json('data/US_bounds.geojson')
-    );
-}
-
-Promise.all(dataPromises).then(geoData => {
-    let dataIndex = 0;
-    const countries = '${config.mapType}' === 'world' ? geoData[dataIndex++] : null;
-    const countryBounds = '${config.mapType}' === 'world' ? geoData[dataIndex++] : null;
-    const states = ('${config.mapType}' === 'us' || hasHighlightedStates) ? geoData[dataIndex++] : null;
-    const stateBounds = ('${config.mapType}' === 'us' || hasHighlightedStates) ? geoData[dataIndex++] : null;
-
-    // Merge features for world map with highlighted states
-    let regions = null;
-    let bounds = null;
-
-    if ('${config.mapType}' === 'us') {
-        regions = states;
-        bounds = stateBounds;
-    } else if ('${config.mapType}' === 'world') {
-        if (hasHighlightedStates) {
-            // Merge US states with countries, excluding USA
-            const nonUSACountries = countries.features.filter(f => 
-                f.properties.ISO_A3 !== 'USA'
-            );
-            regions = {
-                type: 'FeatureCollection',
-                features: [...nonUSACountries, ...states.features]
-            };
-            
-            // Merge bounds
-            const nonUSABounds = countryBounds.features.filter(f => 
-                f.properties.ISO_A3 !== 'USA'
-            );
-            bounds = {
-                type: 'FeatureCollection',
-                features: [...nonUSABounds, ...stateBounds.features]
-            };
-        } else {
-            regions = countries;
-            bounds = countryBounds;
-        }
+// Load GeoJSON data
+Promise.all([
+    d3.json('data/countries.geojson'),
+    d3.json('data/US_states.geojson'),
+    d3.json('data/country_bounds.geojson'),
+    d3.json('data/US_bounds.geojson')
+]).then(([countries, states, countryBounds, stateBounds]) => {
+    if (!countries || !states || !countryBounds || !stateBounds) {
+        throw new Error('Failed to load one or more GeoJSON files');
     }
 
+    // Create projection based on map type
+    const projection = mapType === 'us'
+        ? d3.geoAlbersUsa()
+            .scale(width * 0.45)
+            .translate([width / 2, height / 2])
+        : d3.geoEqualEarth()
+            .scale(Math.min(width / 4.6, height / 2.9))
+            .translate([width / 2, height / 2]);
+        
+    // Create path generator
+    const path = d3.geoPath().projection(projection);
+    
+    // For US maps, only use state features
+    const features = mapType === 'us' ? states.features : countries.features;
+    
     // Draw regions
     regionsLayer.selectAll('path')
-        .data(regions.features)
+        .data(features)
         .enter()
         .append('path')
         .attr('d', path)
         .attr('fill', d => {
             const code = d.properties.postal || d.properties.ISO_A3;
-            return ${JSON.stringify(config.highlightColors)}[code] || '${config.defaultFill}';
+            return highlightColors[code] || defaultFill;
         })
         .on('mouseover', (event, d) => {
             const name = d.properties.name || d.properties.NAME;
@@ -201,8 +159,10 @@ Promise.all(dataPromises).then(geoData => {
         });
         
     // Draw bounds
+    const boundFeatures = mapType === 'us' ? stateBounds.features : countryBounds.features;
+        
     boundsLayer.selectAll('path')
-        .data(bounds.features)
+        .data(boundFeatures)
         .enter()
         .append('path')
         .attr('d', path)
@@ -210,103 +170,115 @@ Promise.all(dataPromises).then(geoData => {
         .attr('stroke', '#F9F5F1')
         .attr('stroke-width', '1');
         
-    // Add labels (always show for highlighted regions)
+    // Add labels
     labelsLayer.selectAll('text')
-        .data(regions.features)
+        .data(features)
         .enter()
         .append('text')
         .attr('transform', d => {
             const centroid = path.centroid(d);
             if (isNaN(centroid[0]) || isNaN(centroid[1])) {
+                console.error('Invalid centroid for feature:', d);
                 return null;
             }
             return \`translate(\${centroid})\`;
         })
         .attr('text-anchor', 'middle')
         .attr('dy', '.35em')
-        .style('font-size', '12px')
+        .style('font-size', '10px')
         .style('fill', '#333')
         .style('font-weight', 'bold')
         .style('pointer-events', 'none')
         .text(d => {
             const code = d.properties.postal || d.properties.ISO_A3;
-            
-            // Show label if region is highlighted
-            if (${JSON.stringify(config.highlightColors)}[code]) {
-                return d.properties.name || d.properties.NAME;
-            }
-            return '';
+            // Only show label if region is highlighted
+            return highlightColors[code] ? (d.properties.name || d.properties.NAME) : '';
         });
+}).catch(error => {
+    console.error('Error loading GeoJSON:', error);
+    document.getElementById('map').innerHTML = \`Error: \${error.message}\`;
 });`;
 }
 
 /**
- * Export map as D3 bundle
- * @param {MapData} data - Map configuration
- * @returns {Promise<Blob>} ZIP file containing D3 bundle
+ * Export D3 visualization as standalone bundle
+ * @param {HTMLElement} container - Map container element
+ * @returns {Promise<Blob>} Bundle as zip file
  */
-export async function exportBundle(data) {
-    log('BUNDLE', 'Starting bundle export', { config: data });
-    
-    // Load GeoJSON data
-    const geojsonData = await loadGeoJSON();
-    
-    const zip = new JSZip();
-    
-    // Create directory structure
-    const srcDir = zip.folder('src');
-    const cssDir = zip.folder('css');
-    const dataDir = zip.folder('data');
-    
-    log('BUNDLE', 'Created ZIP structure');
-    
-    // Add template files
-    zip.file('index.html', HTML_TEMPLATE);
-    cssDir?.file('styles.css', CSS);
-    srcDir?.file('visualization.js', generateVisualizationCode(data));
-    
-    log('BUNDLE', 'Added template files');
-    
-    // Only include needed datasets
-    if (data.mapType === 'world') {
-        log('BUNDLE', 'Adding world map data');
-        dataDir?.file('countries.geojson', JSON.stringify(geojsonData.countries, null, 2));
-        dataDir?.file('country_bounds.geojson', JSON.stringify(geojsonData.countryBounds, null, 2));
+export async function exportBundle(container) {
+    try {
+        const zip = new JSZip();
+        
+        // Add HTML template
+        zip.file('index.html', HTML_TEMPLATE);
+        
+        // Create src directory
+        const src = zip.folder('src');
+        
+        // Add visualization code
+        const svg = container.querySelector('svg');
+        if (!svg) throw new Error('No map found to export');
+        
+        const mapData = {
+            width: container.clientWidth,
+            height: container.clientHeight,
+            svg: svg.outerHTML,
+            highlightColors: currentMapData.highlightColors,
+            defaultFill: currentMapData.defaultFill,
+            mapType: currentMapData.mapType,
+            labels: currentMapData.labels
+        };
+        
+        src.file('visualization.js', generateVisualizationCode(mapData));
+        
+        // Create data directory
+        const data = zip.folder('data');
+        
+        // Add GeoJSON files
+        const [countries, states, countryBounds, stateBounds] = await Promise.all([
+            fetch('/geojson/countries.geojson').then(r => r.json()),
+            fetch('/geojson/US_states.geojson').then(r => r.json()),
+            fetch('/geojson/country_bounds.geojson').then(r => r.json()),
+            fetch('/geojson/US_bounds.geojson').then(r => r.json())
+        ]);
+        
+        data.file('countries.geojson', JSON.stringify(countries));
+        data.file('US_states.geojson', JSON.stringify(states));
+        data.file('country_bounds.geojson', JSON.stringify(countryBounds));
+        data.file('US_bounds.geojson', JSON.stringify(stateBounds));
+        
+        // Add CSS
+        const css = zip.folder('css');
+        css.file('styles.css', `
+            body {
+                margin: 0;
+                padding: 20px;
+                font-family: Optima, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+                background: #ffffff;
+            }
+            #map { 
+                width: 100%;
+                height: 600px;
+                background: #F9F5F1;
+                border-radius: 4px;
+            }
+            .tooltip {
+                position: absolute;
+                visibility: hidden;
+                background-color: #ffffff;
+                padding: 10px;
+                border-radius: 5px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                font-size: 14px;
+                pointer-events: none;
+            }
+        `);
+        
+        // Generate bundle
+        return await zip.generateAsync({ type: 'blob' });
+        
+    } catch (error) {
+        log('EXPORT', 'Error exporting bundle', { error });
+        throw error;
     }
-    
-    if (data.mapType === 'us' || data.states?.some(s => 
-        /^[A-Z]{2}$/.test(s.postalCode) && data.highlightColors?.[s.postalCode]
-    )) {
-        log('BUNDLE', 'Adding US map data');
-        dataDir?.file('US_states.geojson', JSON.stringify(geojsonData.states, null, 2));
-        dataDir?.file('US_bounds.geojson', JSON.stringify(geojsonData.stateBounds, null, 2));
-    }
-    
-    // Add documentation
-    zip.file('README.md', `# D3.js Map Visualization Bundle
-    
-This bundle contains a self-contained D3.js map visualization.
-
-## Files
-- \`index.html\`: Main HTML file
-- \`css/styles.css\`: Basic styling
-- \`src/visualization.js\`: D3.js visualization code
-- \`data/*.geojson\`: Map data files
-
-## Usage
-1. Unzip the bundle
-2. Serve the files using a local web server
-3. Open index.html in your browser`);
-    
-    log('BUNDLE', 'Added documentation');
-    
-    // Generate ZIP
-    log('BUNDLE', 'Generating final ZIP');
-    const blob = await zip.generateAsync({ type: 'blob' });
-    log('BUNDLE', 'Bundle export complete', { 
-        sizeBytes: blob.size,
-        type: blob.type
-    });
-    
-    return blob;
 }

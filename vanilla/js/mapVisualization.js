@@ -118,10 +118,10 @@ export async function renderMap(container, mapData) {
         // Create projection
         const projection = mapData.mapType === 'us' 
             ? d3.geoAlbersUsa()
-                .scale(width * 1.3)
+                .scale(width * 1.1)
                 .translate([width / 2, height / 2])
             : d3.geoEqualEarth()
-                .scale(Math.min(width / 6.5, height / 4))
+                .scale(Math.min(width / 4.6, height / 2.9))
                 .translate([width / 2, height / 2]);
         
         // Create path generator
@@ -172,7 +172,7 @@ export async function renderMap(container, mapData) {
             .append('path')
             .attr('d', path)
             .attr('fill', 'none')
-            .attr('stroke', mapData.borderColor)
+            .attr('stroke', '#F9F5F1')
             .attr('stroke-width', '1');
             
         // Add labels (always show for highlighted regions)
@@ -190,7 +190,7 @@ export async function renderMap(container, mapData) {
             })
             .attr('text-anchor', 'middle')
             .attr('dy', '.35em')
-            .style('font-size', '12px')
+            .style('font-size', '10px')
             .style('fill', '#333')
             .style('font-weight', 'bold')
             .style('pointer-events', 'none')
