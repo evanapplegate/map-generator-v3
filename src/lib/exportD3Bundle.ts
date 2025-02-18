@@ -34,51 +34,93 @@ const renderMap = async (config) => {
 
   const path = d3.geoPath().projection(projection);
 
-  // Load all data
-  const [countries, countryBounds, states, stateBounds] = await Promise.all([
-    fetch('data/countries.geojson').then(r => r.json()),
-    fetch('data/country_bounds.geojson').then(r => r.json()),
-    fetch('data/US_states.geojson').then(r => r.json()),
-    fetch('data/US_bounds.geojson').then(r => r.json())
-  ]);
+  // Load required data
+  const dataPromises = [];
+  if (config.mapType === 'world') {
+    dataPromises.push(
+      fetch('data/countries.geojson').then(r => r.json()),
+      fetch('data/country_bounds.geojson').then(r => r.json())
+    );
+  }
+  // Only load states if it's a US map or if specific states are highlighted in world map
+  const hasHighlightedStates = config.states?.some(s => 
+    /^[A-Z]{2}$/.test(s.postalCode) && config.highlightColors?.[s.postalCode]
+  );
+  if (config.mapType === 'us' || hasHighlightedStates) {
+    dataPromises.push(
+      fetch('data/US_states.geojson').then(r => r.json()),
+      fetch('data/US_bounds.geojson').then(r => r.json())
+    );
+  }
 
-  // Draw countries first
-  svg.append("g")
-    .selectAll("path")
-    .data(countries.features)
-    .join("path")
-    .attr("d", path)
-    .attr("fill", (d) => {
-      const code = d.properties?.ISO_A3 || d.properties?.iso_a3;
-      return config.highlightColors?.[code] || config.defaultFill || "#edded1";
-    });
+  const geoData = await Promise.all(dataPromises);
+  let dataIndex = 0;
+  const countries = config.mapType === 'world' ? geoData[dataIndex++] : null;
+  const countryBounds = config.mapType === 'world' ? geoData[dataIndex++] : null;
+  const states = (config.mapType === 'us' || hasHighlightedStates) ? geoData[dataIndex++] : null;
+  const stateBounds = (config.mapType === 'us' || hasHighlightedStates) ? geoData[dataIndex++] : null;
 
-  // Draw states on top
-  svg.append("g")
-    .selectAll("path")
-    .data(states.features)
-    .join("path")
-    .attr("d", path)
-    .attr("fill", (d) => {
-      const code = d.properties?.postal;
-      return config.highlightColors?.[code] || config.defaultFill || "#edded1";
-    });
+  // Draw base regions based on map type
+  if (config.mapType === 'world') {
+    svg.append("g")
+      .attr("id", "countries")
+      .selectAll("path")
+      .data(countries.features)
+      .join("path")
+      .attr("d", path)
+      .attr("fill", (d) => {
+        const code = d.properties?.ISO_A3 || d.properties?.iso_a3;
+        return config.highlightColors?.[code] || config.defaultFill || "#edded1";
+      });
+  }
 
-  // Draw all boundaries
-  svg.append("g")
-    .selectAll("path")
-    .data([...countryBounds.features, ...stateBounds.features])
-    .join("path")
-    .attr("d", path)
-    .attr("fill", "none")
-    .attr("stroke", "#ffffff")
-    .attr("stroke-width", "1px");
+  // Draw states for US maps or when specific states are highlighted
+  if (config.mapType === 'us' || hasHighlightedStates) {
+    svg.append("g")
+      .attr("id", "US_states")
+      .selectAll("path")
+      .data(states.features)
+      .join("path")
+      .attr("d", path)
+      .attr("fill", (d) => {
+        const code = d.properties?.postal;
+        // Only show states that are highlighted in world maps
+        if (config.mapType !== 'us' && !config.highlightColors?.[code]) return "none";
+        return config.highlightColors?.[code] || config.defaultFill || "#edded1";
+      });
+  }
+
+  // Draw boundaries based on map type
+  if (config.mapType === 'world') {
+    svg.append("g")
+      .attr("id", "country_bounds")
+      .selectAll("path")
+      .data(countryBounds.features)
+      .join("path")
+      .attr("d", path)
+      .attr("fill", "none")
+      .attr("stroke", "#ffffff")
+      .attr("stroke-width", "1px");
+  }
+
+  if (config.mapType === 'us' || hasHighlightedStates) {
+    svg.append("g")
+      .attr("id", "US_bounds")
+      .selectAll("path")
+      .data(stateBounds.features)
+      .join("path")
+      .attr("d", path)
+      .attr("fill", "none")
+      .attr("stroke", "#ffffff")
+      .attr("stroke-width", config.mapType === 'us' ? "1px" : "0.5px");
+  }
 
   // Add labels if enabled
   if (config.showLabels) {
     svg.append("g")
+      .attr("id", "labels")
       .selectAll("text")
-      .data([...countries.features, ...states.features])
+      .data(config.mapType === 'us' ? states.features : [...countries.features, ...states.features])
       .join("text")
       .attr("transform", (d) => {
         const centroid = path.centroid(d);
@@ -172,11 +214,18 @@ body {
   cssDir?.file("styles.css", css);
   srcDir?.file("visualization.js", visualizationCode);
 
-  // Always include all datasets
-  dataDir?.file('countries.geojson', JSON.stringify(geojsonData.countries, null, 2));
-  dataDir?.file('country_bounds.geojson', JSON.stringify(geojsonData.countryBounds, null, 2));
-  dataDir?.file('US_states.geojson', JSON.stringify(geojsonData.states, null, 2));
-  dataDir?.file('US_bounds.geojson', JSON.stringify(geojsonData.stateBounds, null, 2));
+  // Only include needed datasets
+  if (data.mapType === 'world') {
+    dataDir?.file('countries.geojson', JSON.stringify(geojsonData.countries, null, 2));
+    dataDir?.file('country_bounds.geojson', JSON.stringify(geojsonData.countryBounds, null, 2));
+  }
+  
+  if (data.mapType === 'us' || data.states?.some(s => 
+    /^[A-Z]{2}$/.test(s.postalCode) && data.highlightColors?.[s.postalCode]
+  )) {
+    dataDir?.file('US_states.geojson', JSON.stringify(geojsonData.states, null, 2));
+    dataDir?.file('US_bounds.geojson', JSON.stringify(geojsonData.stateBounds, null, 2));
+  }
 
   // Add documentation
   zip.file("README.md", `# D3.js Map Visualization Bundle

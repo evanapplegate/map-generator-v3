@@ -18,6 +18,13 @@ AVAILABLE GEOJSON FILES AND THEIR FIELDS:
    - country_bounds.geojson: World boundaries
    - US_bounds.geojson: US state boundaries
 
+REGION HANDLING:
+- For world maps: Only include US states if explicitly mentioned
+- For US maps: Only include states, no countries
+- Example world map: "India in purple, france in teal"
+- Example world map with states: "world map, france in blue, texas in red"
+- Example US-nly map: "california and nevada in green"
+
 COLOR PREFERENCES:
 - Default fill color: "#edded1"
 - Default border color: "#ffffff"
@@ -93,6 +100,26 @@ const validateResponse = (jsonResponse: any): { isValid: boolean; issues: string
   const isValidPostalCode = (code: string, mapType: string) => {
     return mapType === 'us' ? /^[A-Z]{2}$/.test(code) : /^[A-Z]{3}$/.test(code);
   };
+
+  // Check for mixed country/state codes based on map type
+  const hasValidRegionMix = jsonResponse.states.every((state: any) => {
+    const isStateCode = /^[A-Z]{2}$/.test(state.postalCode);
+    const isCountryCode = /^[A-Z]{3}$/.test(state.postalCode);
+    
+    if (jsonResponse.mapType === 'us') {
+      return isStateCode; // US maps should only have state codes
+    } else {
+      // World maps can have both, but states must be explicitly highlighted
+      return isCountryCode || (isStateCode && jsonResponse.highlightColors?.[state.postalCode]);
+    }
+  });
+
+  if (!hasValidRegionMix) {
+    return {
+      isValid: false,
+      issues: ['Invalid mix of country and state codes for map type']
+    };
+  }
 
   const hasValidPostalCodes = jsonResponse.states.every((state: any) =>
     state.postalCode && typeof state.postalCode === 'string' && 

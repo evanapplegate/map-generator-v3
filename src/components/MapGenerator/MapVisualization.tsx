@@ -82,45 +82,69 @@ const MapVisualization = ({ data }: MapVisualizationProps) => {
         console.log('First region feature:', countries.features[0]);
         
         // Draw regions - STRICTLY NO STROKE
-        // First draw countries
-        svg.append("g")
-          .selectAll("path")
-          .data(countries.features)
-          .join("path")
-          .attr("d", path)
-          .attr("fill", (d: any) => {
-            const code = d.properties?.ISO_A3 || d.properties?.iso_a3;
-            return data.highlightColors?.[code] || data.defaultFill || "#edded1";
-          });
+        // Draw base regions based on map type
+        if (!isUSMap) {
+          svg.append("g")
+            .attr("id", "countries")
+            .selectAll("path")
+            .data(countries.features)
+            .join("path")
+            .attr("d", path)
+            .attr("fill", (d: any) => {
+              const code = d.properties?.ISO_A3 || d.properties?.iso_a3;
+              return data.highlightColors?.[code] || data.defaultFill || "#edded1";
+            });
+        }
 
-        // Then draw states on top
-        svg.append("g")
-          .selectAll("path")
-          .data(states.features)
-          .join("path")
-          .attr("d", path)
-          .attr("fill", (d: any) => {
-            const code = d.properties?.postal;
-            return data.highlightColors?.[code] || data.defaultFill || "#edded1";
-          });
+        // Draw states for US maps or when specific states are highlighted
+        const hasHighlightedStates = data.states?.some(s => data.highlightColors?.[s.postalCode]);
+        if (isUSMap || hasHighlightedStates) {
+          svg.append("g")
+            .attr("id", "US_states")
+            .selectAll("path")
+            .data(states.features)
+            .join("path")
+            .attr("d", path)
+            .attr("fill", (d: any) => {
+              const code = d.properties?.postal;
+              // Only show states that are highlighted in world maps
+              if (!isUSMap && !data.highlightColors?.[code]) return "none";
+              return data.highlightColors?.[code] || data.defaultFill || "#edded1";
+            });
+        }
 
         // Draw bounds - STRICTLY 1PX WHITE STROKE
-        svg.append("g")
-          .selectAll("path")
-          .data([...countryBounds.features, ...stateBounds.features])
-          .join("path")
-          .datum((d: any) => d)
-          .attr("d", path)
-          .attr("fill", "none")
-          .attr("stroke", "#F9F5F1")
-          .attr("stroke-width", "1");
+        if (!isUSMap) {
+          svg.append("g")
+            .attr("id", "country_bounds")
+            .selectAll("path")
+            .data(countryBounds.features)
+            .join("path")
+            .attr("d", path)
+            .attr("fill", "none")
+            .attr("stroke", "#F9F5F1")
+            .attr("stroke-width", "1");
+        }
 
-        // Add labels where specified
+        if (isUSMap || hasHighlightedStates) {
+          svg.append("g")
+            .attr("id", "US_bounds")
+            .selectAll("path")
+            .data(stateBounds.features)
+            .join("path")
+            .attr("d", path)
+            .attr("fill", "none")
+            .attr("stroke", "#F9F5F1")
+            .attr("stroke-width", isUSMap ? "1" : "0.5");
+        }
+
+        // Add labels if enabled
         if (data.showLabels) {
           console.log('Adding labels...');
           svg.append("g")
+            .attr("id", "labels")
             .selectAll("text")
-            .data([...countries.features, ...states.features])
+            .data(isUSMap ? states.features : [...countries.features, ...states.features])
             .join("text")
             .attr("transform", (d: any) => {
               const centroid = path.centroid(d);
