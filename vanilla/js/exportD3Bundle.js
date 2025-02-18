@@ -85,6 +85,7 @@ const aspect = width / height;
 const highlightColors = ${JSON.stringify(mapData.highlightColors)};
 const defaultFill = '${mapData.defaultFill}';
 const mapType = '${mapData.mapType}';
+const stateList = ${JSON.stringify(mapData.states || [])};
 
 // Create SVG
 const svg = d3.select('#map')
@@ -129,7 +130,16 @@ Promise.all([
     const path = d3.geoPath().projection(projection);
     
     // For US maps, only use state features
-    const features = mapType === 'us' ? states.features : countries.features;
+    // For world maps, check if we need to include US states
+    const hasHighlightedStates = stateList?.some(s => 
+        /^[A-Z]{2}$/.test(s.postalCode) && highlightColors[s.postalCode]
+    );
+    
+    const features = mapType === 'us' 
+        ? states.features 
+        : hasHighlightedStates
+            ? [...countries.features.filter(f => f.properties.ISO_A3 !== 'USA'), ...states.features]
+            : countries.features;
     
     // Draw regions
     regionsLayer.selectAll('path')
@@ -147,7 +157,7 @@ Promise.all([
             
             tooltip
                 .style('visibility', 'visible')
-                .html(\`<strong>\${name}</strong> (\${code})\`);
+                .html(\`<strong>\${name}</strong>\`);
         })
         .on('mousemove', (event) => {
             tooltip
@@ -159,7 +169,11 @@ Promise.all([
         });
         
     // Draw bounds
-    const boundFeatures = mapType === 'us' ? stateBounds.features : countryBounds.features;
+    const boundFeatures = mapType === 'us'
+        ? stateBounds.features
+        : hasHighlightedStates
+            ? [...countryBounds.features.filter(f => f.properties.ISO_A3 !== 'USA'), ...stateBounds.features]
+            : countryBounds.features;
         
     boundsLayer.selectAll('path')
         .data(boundFeatures)
@@ -226,7 +240,8 @@ export async function exportBundle(container) {
             highlightColors: currentMapData.highlightColors,
             defaultFill: currentMapData.defaultFill,
             mapType: currentMapData.mapType,
-            labels: currentMapData.labels
+            labels: currentMapData.labels,
+            states: currentMapData.states
         };
         
         src.file('visualization.js', generateVisualizationCode(mapData));

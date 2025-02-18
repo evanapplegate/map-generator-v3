@@ -154,7 +154,7 @@ export async function renderMap(container, mapData) {
                 
                 tooltip
                     .style('visibility', 'visible')
-                    .html(`<strong>${name}</strong> (${code})`);
+                    .html(`<strong>${name}</strong>`);
             })
             .on('mousemove', (event) => {
                 tooltip
