@@ -3,49 +3,87 @@ import { log } from './logger.js';
 /**
  * Load GeoJSON data for map
  * @param {string} type - Map type ('us' or 'world')
+ * @param {Object} mapData - Map configuration data
  * @returns {Promise<Object>} GeoJSON data
  */
-async function loadGeoJSON(type) {
+async function loadGeoJSON(type, mapData) {
     log('D3', 'Loading GeoJSON', { type });
     
-    const filename = type === 'us' ? 'US_states.geojson' : 'countries.geojson';
-    const response = await fetch(`/geojson/${filename}`);
+    // Always load both datasets to handle mixed queries
+    const [countries, states] = await Promise.all([
+        fetch('/geojson/countries.geojson').then(r => r.json()),
+        fetch('/geojson/US_states.geojson').then(r => r.json())
+    ]);
     
-    if (!response.ok) {
-        throw new Error(`Failed to load ${filename}`);
+    // For US maps, only return states
+    // For world maps or mixed queries, merge features
+    if (type === 'us') {
+        return states;
+    } else {
+        // Find any US states that are highlighted
+        const hasHighlightedStates = mapData.states?.some(s => 
+            /^[A-Z]{2}$/.test(s.postalCode) && mapData.highlightColors?.[s.postalCode]
+        );
+        
+        if (hasHighlightedStates) {
+            // Merge US states with countries, excluding USA from countries
+            const nonUSACountries = countries.features.filter(f => 
+                f.properties.ISO_A3 !== 'USA'
+            );
+            return {
+                type: 'FeatureCollection',
+                features: [...nonUSACountries, ...states.features]
+            };
+        }
+        
+        return countries;
     }
-    
-    const data = await response.json();
-    log('D3', 'GeoJSON loaded', { 
-        features: data.features.length,
-        type: data.type
-    });
-    
-    return data;
 }
 
 /**
  * Load bounds GeoJSON data
  * @param {string} type - Map type ('us' or 'world')
+ * @param {Object} mapData - Map configuration data
  * @returns {Promise<Object>} Bounds GeoJSON data
  */
-async function loadBoundsGeoJSON(type) {
-    const filename = type === 'us' ? 'US_bounds.geojson' : 'country_bounds.geojson';
-    const response = await fetch(`/geojson/${filename}`);
+async function loadBoundsGeoJSON(type, mapData) {
+    // Always load both datasets to handle mixed queries
+    const [countryBounds, stateBounds] = await Promise.all([
+        fetch('/geojson/country_bounds.geojson').then(r => r.json()),
+        fetch('/geojson/US_bounds.geojson').then(r => r.json())
+    ]);
     
-    if (!response.ok) {
-        throw new Error(`Failed to load ${filename}`);
+    // For US maps, only return state bounds
+    // For world maps or mixed queries, merge bounds
+    if (type === 'us') {
+        return stateBounds;
+    } else {
+        // Find any US states that are highlighted
+        const hasHighlightedStates = mapData.states?.some(s => 
+            /^[A-Z]{2}$/.test(s.postalCode) && mapData.highlightColors?.[s.postalCode]
+        );
+        
+        if (hasHighlightedStates) {
+            // Merge US bounds with country bounds, excluding USA
+            const nonUSABounds = countryBounds.features.filter(f => 
+                f.properties.ISO_A3 !== 'USA'
+            );
+            return {
+                type: 'FeatureCollection',
+                features: [...nonUSABounds, ...stateBounds.features]
+            };
+        }
+        
+        return countryBounds;
     }
-    
-    return response.json();
 }
 
 /**
  * Render map using D3
- * @param {Object} mapData - Map configuration
  * @param {HTMLElement} container - Container element
+ * @param {Object} mapData - Map configuration
  */
-export async function renderMap(mapData, container) {
+export async function renderMap(container, mapData) {
     log('D3', 'Starting map render', mapData);
     
     try {
@@ -54,8 +92,8 @@ export async function renderMap(mapData, container) {
         
         // Load GeoJSON
         const [geoData, boundsData] = await Promise.all([
-            loadGeoJSON(mapData.mapType),
-            loadBoundsGeoJSON(mapData.mapType)
+            loadGeoJSON(mapData.mapType, mapData),
+            loadBoundsGeoJSON(mapData.mapType, mapData)
         ]);
         
         // Set dimensions
@@ -107,16 +145,12 @@ export async function renderMap(mapData, container) {
             .append('path')
             .attr('d', path)
             .attr('fill', d => {
-                const code = mapData.mapType === 'us' 
-                    ? d.properties.postal
-                    : d.properties.ISO_A3;
+                const code = d.properties.postal || d.properties.ISO_A3;
                 return mapData.highlightColors[code] || mapData.defaultFill;
             })
             .on('mouseover', (event, d) => {
-                const name = d.properties.NAME || d.properties.name || 'Unknown';
-                const code = mapData.mapType === 'us' 
-                    ? d.properties.postal 
-                    : d.properties.ISO_A3;
+                const name = d.properties.name || d.properties.NAME;
+                const code = d.properties.postal || d.properties.ISO_A3;
                 
                 tooltip
                     .style('visibility', 'visible')
@@ -138,7 +172,7 @@ export async function renderMap(mapData, container) {
             .append('path')
             .attr('d', path)
             .attr('fill', 'none')
-            .attr('stroke', '#F9F5F1')
+            .attr('stroke', mapData.borderColor)
             .attr('stroke-width', '1');
             
         // Add labels (always show for highlighted regions)
@@ -161,23 +195,18 @@ export async function renderMap(mapData, container) {
             .style('font-weight', 'bold')
             .style('pointer-events', 'none')
             .text(d => {
-                const code = mapData.mapType === 'us'
-                    ? d.properties.postal
-                    : d.properties.ISO_A3;
+                const code = d.properties.postal || d.properties.ISO_A3;
                 
                 // Show label if region is highlighted
                 if (mapData.highlightColors[code]) {
-                    return mapData.mapType === 'us'
-                        ? d.properties.name
-                        : d.properties.NAME;
+                    return d.properties.name || d.properties.NAME;
                 }
                 return '';
             });
-        
-        log('D3', 'Map rendered successfully');
-        
+            
+        log('D3', 'Map render complete');
     } catch (error) {
-        log('D3', 'Error rendering map', { error: error.message });
+        log('D3', 'Error rendering map', { error });
         throw error;
     }
 }

@@ -6,126 +6,98 @@ import { log } from './logger.js';
 // Store current map data
 let currentMapData = null;
 
+// Initialize UI elements
+const mapContainer = document.getElementById('map');
+const generateButton = document.getElementById('generate');
+const descriptionInput = document.getElementById('description');
+const exportSvgButton = document.getElementById('export-svg');
+const exportD3Button = document.getElementById('export-d3');
+
+// Ensure map container has dimensions
+mapContainer.style.width = '100%';
+mapContainer.style.height = '600px';
+
 // Initialize app
-document.addEventListener('DOMContentLoaded', () => {
-    log('APP', 'Initializing application');
-    
-    const apiKeyInput = document.getElementById('api-key');
-    const descriptionInput = document.getElementById('map-description');
-    const generateButton = document.getElementById('generate');
-    const exportSvgButton = document.getElementById('export-svg');
-    const exportBundleButton = document.getElementById('export-bundle');
-    const mapContainer = document.getElementById('map-container');
+log('APP', 'Initializing application');
+
+try {
+    if (!mapContainer || !generateButton || !descriptionInput) {
+        throw new Error('Required UI elements not found');
+    }
     
     log('APP', 'Found UI elements');
     
-    // Generate map
+    // Generate map on button click
     generateButton.addEventListener('click', async () => {
-        const apiKey = apiKeyInput.value;
-        const description = descriptionInput.value;
-        
-        if (!apiKey || !description) {
-            log('APP', 'Missing input', { hasApiKey: !!apiKey, hasDescription: !!description });
-            alert('Please enter both API key and map description');
-            return;
-        }
-        
         try {
+            const description = descriptionInput.value;
+            if (!description) return;
+            
             log('APP', 'Starting map generation', { description });
-            generateButton.disabled = true;
-            generateButton.textContent = 'Loading map...';
+            
+            // Clear previous map
+            mapContainer.innerHTML = 'Loading map...';
+            
+            // Generate map data
+            const apiKey = document.getElementById('api-key').value;
+            const mapData = await generateMapData(description, apiKey);
+            log('APP', 'Map data generated', { mapData });
+            
+            // Clear loading text
             mapContainer.innerHTML = '';
-            exportSvgButton.disabled = true;
-            exportBundleButton.disabled = true;
             
-            currentMapData = await generateMapData(description, apiKey);
-            log('APP', 'Map data generated', { mapData: currentMapData });
-            
-            await renderMap(currentMapData, mapContainer);
-            log('APP', 'Map rendered');
+            // Render map
+            await renderMap(mapContainer, mapData);
             
             // Enable export buttons
             exportSvgButton.disabled = false;
-            exportBundleButton.disabled = false;
+            exportD3Button.disabled = false;
+            
         } catch (error) {
             log('APP', 'Error generating map', { error: error.message });
-            alert('Error generating map: ' + error.message);
-        } finally {
-            generateButton.disabled = false;
-            generateButton.textContent = 'Generate Map';
+            mapContainer.innerHTML = `Error: ${error.message}`;
         }
     });
     
-    // Export SVG
+    // Export SVG on button click
     exportSvgButton.addEventListener('click', () => {
-        log('APP', 'Starting SVG export');
         const svg = mapContainer.querySelector('svg');
-        if (!svg) {
-            log('APP', 'No SVG found to export');
-            return;
-        }
+        if (!svg) return;
         
-        const serializer = new XMLSerializer();
-        const svgString = serializer.serializeToString(svg);
-        const blob = new Blob([svgString], { type: 'image/svg+xml' });
-        
-        log('APP', 'SVG serialized', { 
-            sizeBytes: blob.size,
-            type: blob.type
-        });
-        
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'map.svg';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        log('APP', 'SVG export complete');
+        const svgData = new XMLSerializer().serializeToString(svg);
+        downloadFile(svgData, 'map.svg', 'image/svg+xml');
     });
     
-    // Export D3 bundle
-    exportBundleButton.addEventListener('click', async () => {
-        if (!currentMapData) {
-            log('APP', 'No map data to export');
-            return;
-        }
-        
+    // Export D3 bundle on button click
+    exportD3Button.addEventListener('click', async () => {
         try {
-            log('APP', 'Starting bundle export');
-            exportBundleButton.disabled = true;
-            exportBundleButton.textContent = 'Exporting bundle...';
-            
-            const blob = await exportBundle(currentMapData);
-            log('APP', 'Bundle generated', {
-                sizeBytes: blob.size,
-                type: blob.type
-            });
-            
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'map-visualization.zip';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            log('APP', 'Bundle export complete');
+            const bundle = await exportBundle(mapContainer);
+            downloadFile(bundle, 'map-visualization.zip', 'application/zip');
         } catch (error) {
             log('APP', 'Error exporting bundle', { error: error.message });
-            alert('Error exporting bundle: ' + error.message);
-        } finally {
-            exportBundleButton.disabled = false;
-            exportBundleButton.textContent = 'Export Bundle';
         }
     });
     
-    // Disable export buttons initially
-    exportSvgButton.disabled = true;
-    exportBundleButton.disabled = true;
-    
     log('APP', 'Application initialized');
-});
+    
+} catch (error) {
+    log('APP', 'Error initializing application', { error: error.message });
+}
+
+/**
+ * Download file with given content and type
+ * @param {string} content - File content
+ * @param {string} filename - File name
+ * @param {string} type - File MIME type
+ */
+function downloadFile(content, filename, type) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
