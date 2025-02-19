@@ -16,7 +16,7 @@ body {
     margin-bottom: 20px;
 }
 
-#api-key, #map-description {
+#api-key, #description {
     width: 100%;
     box-sizing: border-box;
     padding: 8px;
@@ -24,7 +24,7 @@ body {
     border-radius: 4px;
 }
 
-#map-description {
+#description {
     height: 100px;
     resize: vertical;
 }

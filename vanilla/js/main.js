@@ -4,7 +4,7 @@ import { exportBundle } from './exportD3Bundle.js';
 import { log } from './logger.js';
 
 // Store current map data
-let currentMapData = null;
+export let currentMapData = null;
 
 // Initialize UI elements
 const mapContainer = document.getElementById('map');
@@ -41,6 +41,7 @@ try {
             // Generate map data
             const apiKey = document.getElementById('api-key').value;
             const mapData = await generateMapData(description, apiKey);
+            currentMapData = mapData;  // Set the current map data
             log('APP', 'Map data generated', { mapData });
             
             // Clear loading text
