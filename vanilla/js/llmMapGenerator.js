@@ -26,7 +26,7 @@ REGION HANDLING:
 - Example US-only map: "california and nevada in green"
 
 COLOR PREFERENCES:
-- Default fill color: "#edded1"
+- Default fill color: "#edded1"; any country not specifically colored by user gets this color
 - Default border color: "#ffffff"
 - Use gentle pastels, relatively unsaturated
 - Think 1977 Sunset Magazine aesthetic

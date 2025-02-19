@@ -7,21 +7,26 @@ import { log } from './logger.js';
 export let currentMapData = null;
 
 // Initialize UI elements
-const mapContainer = document.getElementById('map');
+const mapContainer1 = document.getElementById('map1');
+const mapContainer2 = document.getElementById('map2');
 const generateButton = document.getElementById('generate');
 const descriptionInput = document.getElementById('description');
 const exportSvgButton = document.getElementById('export-svg');
 const exportD3Button = document.getElementById('export-d3');
+const exportSvgButton2 = document.getElementById('export-svg2');
+const exportD3Button2 = document.getElementById('export-d3-2');
 
 // Ensure map container has dimensions
-mapContainer.style.width = '100%';
-mapContainer.style.height = '600px';
+mapContainer1.style.width = '100%';
+mapContainer1.style.height = '400px';
+mapContainer2.style.width = '100%';
+mapContainer2.style.height = '400px';
 
 // Initialize app
 log('APP', 'Initializing application');
 
 try {
-    if (!mapContainer || !generateButton || !descriptionInput) {
+    if (!mapContainer1 || !mapContainer2 || !generateButton || !descriptionInput) {
         throw new Error('Required UI elements not found');
     }
     
@@ -35,45 +40,85 @@ try {
             
             log('APP', 'Starting map generation', { description });
             
-            // Clear previous map
-            mapContainer.innerHTML = 'Loading map...';
+            // Clear both containers and hide export buttons
+            mapContainer1.innerHTML = 'Generating first map...';
+            mapContainer2.innerHTML = 'Generating second map...';
+            document.getElementById('export-buttons').style.display = 'none';
+            document.getElementById('export-buttons2').style.display = 'none';
+            exportSvgButton.disabled = true;
+            exportD3Button.disabled = true;
+            exportSvgButton2.disabled = true;
+            exportD3Button2.disabled = true;
             
-            // Generate map data
             const apiKey = document.getElementById('api-key').value;
-            const mapData = await generateMapData(description, apiKey);
-            currentMapData = mapData;  // Set the current map data
-            log('APP', 'Map data generated', { mapData });
             
-            // Clear loading text
-            mapContainer.innerHTML = '';
-            
-            // Render map
-            await renderMap(mapContainer, mapData);
-            
-            // Enable export buttons
-            document.getElementById('export-buttons').style.display = 'flex';
-            exportSvgButton.disabled = false;
-            exportD3Button.disabled = false;
+            // Start first request immediately
+            const req1Promise = generateMapData(description, apiKey)
+                .then(async mapData => {
+                    log('APP', 'First map data generated');
+                    currentMapData = mapData; // Store for first map's export
+                    mapContainer1.innerHTML = 'Rendering...';
+                    await renderMap(mapContainer1, mapData);
+                    document.getElementById('export-buttons').style.display = 'flex';
+                    exportSvgButton.disabled = false;
+                    exportD3Button.disabled = false;
+                });
+
+            // Start second request after 3s delay
+            const req2Promise = new Promise(resolve => setTimeout(resolve, 3000))
+                .then(() => generateMapData(description, apiKey))
+                .then(async mapData => {
+                    log('APP', 'Second map data generated');
+                    mapContainer2.innerHTML = 'Rendering...';
+                    await renderMap(mapContainer2, mapData);
+                    
+                    // Store mapData when exporting second map
+                    exportD3Button2.addEventListener('click', async () => {
+                        currentMapData = mapData;
+                        try {
+                            const bundle = await exportBundle(mapContainer2);
+                            downloadFile(bundle, 'map2-visualization.zip', 'application/zip');
+                        } catch (error) {
+                            log('APP', 'Error exporting bundle', { error: error.message });
+                        }
+                    }, { once: true });
+                    
+                    document.getElementById('export-buttons2').style.display = 'flex';
+                    exportSvgButton2.disabled = false;
+                    exportD3Button2.disabled = false;
+                });
+
+            // Wait for both to complete
+            await Promise.all([req1Promise, req2Promise]);
             
         } catch (error) {
             log('APP', 'Error generating map', { error: error.message });
-            mapContainer.innerHTML = `Error: ${error.message}`;
+            mapContainer1.innerHTML = `Error: ${error.message}`;
+            mapContainer2.innerHTML = `Error: ${error.message}`;
         }
     });
     
     // Export SVG on button click
     exportSvgButton.addEventListener('click', () => {
-        const svg = mapContainer.querySelector('svg');
+        const svg = mapContainer1.querySelector('svg');
         if (!svg) return;
         
         const svgData = new XMLSerializer().serializeToString(svg);
         downloadFile(svgData, 'map.svg', 'image/svg+xml');
     });
     
+    exportSvgButton2.addEventListener('click', () => {
+        const svg = mapContainer2.querySelector('svg');
+        if (!svg) return;
+        
+        const svgData = new XMLSerializer().serializeToString(svg);
+        downloadFile(svgData, 'map2.svg', 'image/svg+xml');
+    });
+    
     // Export D3 bundle on button click
     exportD3Button.addEventListener('click', async () => {
         try {
-            const bundle = await exportBundle(mapContainer);
+            const bundle = await exportBundle(mapContainer1);
             downloadFile(bundle, 'map-visualization.zip', 'application/zip');
         } catch (error) {
             log('APP', 'Error exporting bundle', { error: error.message });

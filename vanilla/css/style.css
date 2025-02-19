@@ -52,21 +52,26 @@ button#generate {
     width: 100%;
 }
 
-#map-section {
+#map-section, #map-section2 {
     border: 1px solid #ddd;
     border-radius: 4px;
     padding: 20px;
+    margin-bottom: 2rem;
 }
 
-#map-container {
+#map-section2 {
+    margin-bottom: 0;
+}
+
+.map {
     width: 100%;
-    height: 500px;
+    height: 400px;
     margin: 20px 0;
-    background: #ffffff;
     border-radius: 4px;
+    text-align: center;
 }
 
-#export-buttons {
+#export-buttons, #export-buttons2 {
     margin-top: 20px;
     display: flex;
     gap: 10px;
