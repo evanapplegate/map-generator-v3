@@ -21,11 +21,11 @@ const exportD3Button3 = document.getElementById('export-d3-3');
 
 // Ensure map container has dimensions
 mapContainer1.style.width = '100%';
-mapContainer1.style.height = '300px';
+mapContainer1.style.height = '400px';
 mapContainer2.style.width = '100%';
-mapContainer2.style.height = '300px';
+mapContainer2.style.height = '400px';
 mapContainer3.style.width = '100%';
-mapContainer3.style.height = '300px';
+mapContainer3.style.height = '400px';
 
 // Initialize app
 log('APP', 'Initializing application');
