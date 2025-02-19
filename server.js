@@ -105,7 +105,7 @@ app.post('/log', (req, res) => {
 // Claude API proxy
 app.post('/api/claude', async (req, res) => {
     try {
-        const { description, apiKey } = req.body;
+        const { description } = req.body;
         
         log('SERVER', 'Proxying Claude request', { description });
         
@@ -113,7 +113,7 @@ app.post('/api/claude', async (req, res) => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': apiKey,
+                'x-api-key': process.env.CLAUDE_API_KEY,
                 'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
