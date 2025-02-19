@@ -63,10 +63,9 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 /**
  * Generate map data using Claude API
  * @param {string} description - User's map description
- * @param {string} apiKey - Claude API key
  * @returns {Promise<Object>} Map configuration
  */
-export async function generateMapData(description, apiKey) {
+export async function generateMapData(description) {
     log('CLAUDE', 'Generating map data', { description });
     
     let lastError;
@@ -79,7 +78,6 @@ export async function generateMapData(description, apiKey) {
                 },
                 body: JSON.stringify({
                     description,
-                    apiKey,
                     system: SYSTEM_PROMPT
                 })
             });

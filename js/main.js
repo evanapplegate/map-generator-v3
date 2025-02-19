@@ -59,10 +59,8 @@ try {
             exportSvgButton3.disabled = true;
             exportD3Button3.disabled = true;
             
-            const apiKey = document.getElementById('api-key').value;
-            
             // Start first request immediately
-            const req1Promise = generateMapData(description, apiKey)
+            const req1Promise = generateMapData(description)
                 .then(async mapData => {
                     log('APP', 'First map data generated');
                     currentMapData = mapData; // Store for first map's export
@@ -75,7 +73,7 @@ try {
 
             // Start second request after 3s delay
             const req2Promise = new Promise(resolve => setTimeout(resolve, 3000))
-                .then(() => generateMapData(description, apiKey))
+                .then(() => generateMapData(description))
                 .then(async mapData => {
                     log('APP', 'Second map data generated');
                     mapContainer2.innerHTML = 'Rendering...';
@@ -87,7 +85,7 @@ try {
 
             // Start third request after 6s delay
             const req3Promise = new Promise(resolve => setTimeout(resolve, 6000))
-                .then(() => generateMapData(description, apiKey))
+                .then(() => generateMapData(description))
                 .then(async mapData => {
                     log('APP', 'Third map data generated');
                     mapContainer3.innerHTML = 'Rendering...';
