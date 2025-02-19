@@ -3,11 +3,11 @@ body {
     color: #8d7a69;
     font-family: Optima, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     margin: 0;
-    padding: 20px;
+    padding: 40px;
 }
 
 #app {
-    max-width: 800px;
+    max-width: 1000px;
     margin: 0 auto;
     padding: 0;
 }
@@ -30,7 +30,7 @@ body {
 }
 
 button {
-    background-color: #333;
+    background-color: #8D7A69;
     color: white;
     border: none;
     padding: 10px 20px;
@@ -40,7 +40,7 @@ button {
 }
 
 button:hover {
-    background: #444;
+    background: #c2b6ac;
 }
 
 button:disabled {
@@ -91,4 +91,29 @@ textarea {
 .loading {
     opacity: 0.7;
     pointer-events: none;
+}
+
+header {
+    margin-bottom: 2rem;
+}
+
+header h1 {
+    margin: 0 0 0.5rem 0;
+}
+
+header p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+header a {
+    color: inherit;
+    text-decoration: underline;
+}
+
+.two-col {
+    display: grid;
+    grid-template-columns: 3fr 7fr;
+    gap: 2rem;
+    align-items: start;
 }

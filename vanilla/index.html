@@ -10,17 +10,26 @@
 </head>
 <body>
     <div id="app">
-        <div id="input-section">
-            <input type="password" id="api-key" placeholder="Enter Claude API Key">
-            <textarea id="description" placeholder="Describe your map (e.g. 'world map with Australia and the U.S. labeled, color them green')"></textarea>
-            <button id="generate">Generate Map</button>
-        </div>
-        
-        <div id="map-section">
-            <div id="map"></div>
-            <div id="export-buttons" style="display: none;">
-                <button id="export-svg">Export SVG</button>
-                <button id="export-d3">Export D3.js Bundle</button>
+        <header>
+            <h1>LLM + D3.js Map Generator</h1>
+            <p>Give a sentence, get an Illustrator-ready layered SVG and a D3.js bundle for embedding. A cartography tool for designers by <a href="https://evanapplegate.com">Evan Applegate</a>.</p>
+        </header>
+        <div class="two-col">
+            <div class="col left">
+                <div id="input-section">
+                    <input type="password" id="api-key" placeholder="Enter Claude API Key">
+                    <textarea id="description" placeholder="Describe your map (e.g. 'world map with Australia and the U.S. labeled, color them green')"></textarea>
+                    <button id="generate">Generate Map</button>
+                </div>
+            </div>
+            <div class="col right">
+                <div id="map-section">
+                    <div id="map"></div>
+                    <div id="export-buttons" style="display: none;">
+                        <button id="export-svg">Export SVG</button>
+                        <button id="export-d3">Export D3.js Bundle</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
