@@ -19,18 +19,54 @@ function log(type, action, data = {}) {
         timestamp,
         type,
         action,
-        data
+        ...data && { data }
     };
     
     // Console output
     console.log(`[${timestamp}] ${type} - ${action}`);
-    if (Object.keys(data).length > 0) {
-        console.log(JSON.stringify(data, null, 2));
+    
+    // File output - one file per day
+    const today = new Date().toISOString().split('T')[0];
+    const logPath = join(logsDir, `${today}.log`);
+    
+    // Trim data for storage
+    const trimmedData = { ...data };
+    if (trimmedData.headers) {
+        // Only keep essential headers
+        trimmedData.headers = {
+            'user-agent': trimmedData.headers['user-agent'],
+            'referer': trimmedData.headers['referer']
+        };
     }
     
-    // File output
-    const logPath = join(logsDir, `${type}_${new Date().toISOString().replace(/[:.]/g, '-')}.log`);
-    fs.appendFileSync(logPath, JSON.stringify(logEntry, null, 2) + '\n');
+    const storedEntry = {
+        timestamp,
+        type,
+        action,
+        ...trimmedData && { data: trimmedData }
+    };
+    
+    fs.appendFileSync(logPath, JSON.stringify(storedEntry) + '\n');
+    
+    // Cleanup old logs (keep last 7 days)
+    try {
+        const files = fs.readdirSync(logsDir);
+        const oldFiles = files
+            .filter(f => f.endsWith('.log'))
+            .map(f => ({ name: f, date: f.split('.')[0] }))
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .slice(7);
+            
+        oldFiles.forEach(f => {
+            try {
+                fs.unlinkSync(join(logsDir, f.name));
+            } catch (err) {
+                console.error(`Failed to delete old log ${f.name}:`, err);
+            }
+        });
+    } catch (err) {
+        console.error('Failed to cleanup logs:', err);
+    }
 }
 
 const app = express();
