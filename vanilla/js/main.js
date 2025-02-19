@@ -51,6 +51,7 @@ try {
             await renderMap(mapContainer, mapData);
             
             // Enable export buttons
+            document.getElementById('export-buttons').style.display = 'flex';
             exportSvgButton.disabled = false;
             exportD3Button.disabled = false;
             
