@@ -262,6 +262,51 @@ export async function exportBundle(container) {
         data.file('country_bounds.geojson', JSON.stringify(countryBounds));
         data.file('US_bounds.geojson', JSON.stringify(stateBounds));
         
+        // Add README
+        data.file('README.md', `# Testing the bundle
+
+To test the bundle, navigate to the folder and run a simple server with Python:
+
+\`\`\`bash
+python -m http.server 8000
+\`\`\`
+
+Then, open a web browser to http://localhost:8000/
+
+# Embedding the map on any web site
+
+To embed the map on any web site, simply copy the contents of this whole folder and serve it from your web server. You can then include the map in an iframe:
+
+\`\`\`html
+<iframe src="http://example.com/map/" width="100%" height="600"></iframe>
+\`\`\`
+
+# Embedding the map directly
+
+To embed the map on any web site without using an iframe, follow these steps:
+
+1. Copy the contents of this folder to your web server.
+2. In your HTML file where you want to embed the map, add the following:
+
+\`\`\`html
+<div id="map"></div>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<link rel="stylesheet" href="css/styles.css">
+<script src="src/visualization.js"></script>
+\`\`\`
+
+Make sure the paths to the CSS and JavaScript files are correct relative to your HTML file.
+
+3. Adjust the size of the map container in your CSS as needed:
+
+\`\`\`css
+#map {
+    width: 100%;
+    height: 600px;
+}
+\`\`\`
+`);
+
         // Add CSS
         const css = zip.folder('css');
         css.file('styles.css', `
