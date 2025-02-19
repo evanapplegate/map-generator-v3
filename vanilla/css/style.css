@@ -1,5 +1,7 @@
 body {
     background-color: #F9F5F1;
+    background-image: url('../images/background.gif');
+    background-repeat: repeat;
     color: #8d7a69;
     font-family: Optima, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     margin: 0;
@@ -20,7 +22,7 @@ body {
     width: 100%;
     box-sizing: border-box;
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid #c5b8ac;
     border-radius: 4px;
 }
 
@@ -52,26 +54,22 @@ button#generate {
     width: 100%;
 }
 
-#map-section, #map-section2 {
-    border: 1px solid #ddd;
+#map-section, #map-section2, #map-section3 {
+    border: 1px solid #c5b8ac;
     border-radius: 4px;
     padding: 20px;
-    margin-bottom: 2rem;
-}
-
-#map-section2 {
-    margin-bottom: 0;
+    margin-bottom: 20px;
 }
 
 .map {
     width: 100%;
-    height: 400px;
+    height: 300px;
     margin: 20px 0;
     border-radius: 4px;
     text-align: center;
 }
 
-#export-buttons, #export-buttons2 {
+#export-buttons, #export-buttons2, #export-buttons3 {
     margin-top: 20px;
     display: flex;
     gap: 10px;
@@ -80,7 +78,7 @@ button#generate {
 
 textarea, input {
     padding: 10px;
-    border: 1px solid #ddd;
+    border: 1px solid #c5b8ac;
     border-radius: 4px;
     font-family: inherit;
     color: inherit;
