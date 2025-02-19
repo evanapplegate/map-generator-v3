@@ -72,6 +72,16 @@ function log(type, action, data = {}) {
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Force HTTPS
+app.enable('trust proxy');
+app.use((req, res, next) => {
+    if (req.secure || process.env.NODE_ENV !== 'production') {
+        next();
+    } else {
+        res.redirect(301, `https://${req.headers.host}${req.url}`);
+    }
+});
+
 // Parse JSON bodies
 app.use(express.json());
 
