@@ -1,5 +1,4 @@
 import { log } from './logger.js';
-import { parseMapRequest } from './mapRequestParser.js';
 
 const SYSTEM_PROMPT = `You are a D3.js map visualization expert. Create map visualizations based on the user's request.
 
