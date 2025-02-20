@@ -18,6 +18,9 @@ AVAILABLE GEOJSON FILES AND THEIR FIELDS:
    - country_bounds.geojson: World boundaries
    - US_bounds.geojson: US state boundaries
 
+4. city files:
+ - cities.geojson: field NAME has the full name; you'll have to do some unicode handling, if user asks for "Sao Paulo," the file has NAME = "São Paulo", so you'll mark it "São Paulo". This also has field "ADM0NAME" for the country so you can disambiguate; if user asks for "Sao Paulo, Brazil" just mark the city name "São Paulo"
+
 REGION HANDLING:
 - For world maps: Only include US states if explicitly mentioned
 - For US maps: Only include states, no countries
@@ -28,9 +31,9 @@ REGION HANDLING:
 COLOR PREFERENCES:
 - Default fill color: "#edded1"; any country not specifically colored by user gets this color
 - Default border color: "#ffffff"
-- Use gentle pastels, relatively unsaturated
+- Use gentle pastels for fills; no fill color above 30% saturation (in HSB color space)
 - Think 1977 Sunset Magazine aesthetic
-- Aim for colors that are distinguishable but harmonious
+- Aim for colors that are distinguishable but harmonious.
 
 RESPOND ONLY WITH A VALID JSON OBJECT. NO OTHER TEXT OR FORMATTING.
 
