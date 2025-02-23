@@ -86,6 +86,9 @@ const highlightColors = ${JSON.stringify(mapData.highlightColors)};
 const defaultFill = '${mapData.defaultFill}';
 const mapType = '${mapData.mapType}';
 const stateList = ${JSON.stringify(mapData.states || [])};
+const cities = ${JSON.stringify(mapData.cities || [])};
+const showLabels = ${mapData.showLabels};
+const borderColor = '${mapData.borderColor}';
 
 // Create SVG
 const svg = d3.select('#map')
@@ -99,7 +102,10 @@ const svg = d3.select('#map')
 // Create layers
 const regionsLayer = svg.append('g').attr('id', 'regions-layer');
 const boundsLayer = svg.append('g').attr('id', 'bounds-layer');
-const labelsLayer = svg.append('g').attr('id', 'labels-layer');
+const disputedBoundsLayer = svg.append('g').attr('id', 'disputed_bounds');
+const cityDotsLayer = svg.append('g').attr('id', 'city-dots');
+const cityLabelsLayer = svg.append('g').attr('id', 'city-labels');
+const countryLabelsLayer = svg.append('g').attr('id', 'country-labels');
 
 // Create tooltip
 const tooltip = d3.select('body')
@@ -110,10 +116,11 @@ const tooltip = d3.select('body')
 Promise.all([
     d3.json('data/countries.geojson'),
     d3.json('data/US_states.geojson'),
-    d3.json('data/country_bounds.geojson'),
-    d3.json('data/US_bounds.geojson')
-]).then(([countries, states, countryBounds, stateBounds]) => {
-    if (!countries || !states || !countryBounds || !stateBounds) {
+    d3.json(mapType === 'us' ? 'data/US_bounds.geojson' : 'data/country_bounds.geojson'),
+    d3.json('data/cities.geojson'),
+    mapType === 'world' ? d3.json('data/country_disputed_bounds.geojson') : Promise.resolve(null)
+]).then(([countries, states, bounds, citiesData, disputedBounds]) => {
+    if (!countries || !states || !bounds || !citiesData) {
         throw new Error('Failed to load one or more GeoJSON files');
     }
 
@@ -143,7 +150,7 @@ Promise.all([
     
     // Draw regions
     regionsLayer.selectAll('path')
-        .data(features)
+        .data(mapType === 'us' ? states.features : countries.features)
         .enter()
         .append('path')
         .attr('d', path)
@@ -151,6 +158,82 @@ Promise.all([
             const code = d.properties.postal || d.properties.ISO_A3;
             return highlightColors[code] || defaultFill;
         })
+        .attr('stroke', borderColor)
+        .attr('stroke-width', '0.5');
+
+    // Draw bounds
+    boundsLayer.selectAll('path')
+        .data(bounds.features)
+        .join('path')
+        .attr('d', path)
+        .attr('fill', 'none')
+        .attr('stroke', '#F9F5F1')
+        .attr('stroke-width', '1');
+            
+    // Draw disputed bounds for world maps
+    if (mapType === 'world' && disputedBounds?.features) {
+        disputedBoundsLayer.selectAll('path')
+            .data(disputedBounds.features)
+            .join('path')
+            .attr('d', path)
+            .attr('fill', 'none')
+            .attr('stroke', '#F9F5F1')
+            .attr('stroke-width', '1')
+            .attr('stroke-dasharray', '1,1');
+    }
+
+    // Add cities and labels
+    if (cities) {
+        const requestedCities = citiesData.features.filter(city => 
+            cities.some(c => city.properties.NAME === c.name)
+        );
+        
+        // City dots
+        cityDotsLayer.selectAll('circle')
+           .data(requestedCities)
+           .join('circle')
+           .attr('cx', d => projection(d.geometry.coordinates)[0])
+           .attr('cy', d => projection(d.geometry.coordinates)[1])
+           .attr('r', 1)
+           .attr('fill', '#000')
+           .attr('stroke', 'none');
+           
+        // City labels
+        cityLabelsLayer.selectAll('text')
+           .data(requestedCities)
+           .join('text')
+           .attr('x', d => projection(d.geometry.coordinates)[0] + 3)
+           .attr('y', d => projection(d.geometry.coordinates)[1])
+           .text(d => d.properties.NAME)
+           .attr('font-size', '8px')
+           .attr('fill', '#000000')
+           .style('font-weight', 'normal');
+    }
+    
+    // Add country/state labels
+    if (showLabels) {
+        const features = mapType === 'us' ? states.features : countries.features;
+        countryLabelsLayer.selectAll('text')
+            .data(features)
+            .join('text')
+            .attr('x', d => path.centroid(d)[0])
+            .attr('y', d => path.centroid(d)[1])
+            .text(d => {
+                const code = d.properties.postal || d.properties.ISO_A3;
+                return highlightColors[code] ? (d.properties.name || d.properties.NAME) : '';
+            })
+            .attr('text-anchor', 'middle')
+            .attr('font-size', '8px')
+            .attr('fill', '#000000')
+            .style('font-weight', 'bold')
+            .style('display', d => {
+                const code = d.properties.postal || d.properties.ISO_A3;
+                return highlightColors[code] ? 'block' : 'none';
+            });
+    }
+        
+    // Add tooltip
+    regionsLayer.selectAll('path')
         .on('mouseover', (event, d) => {
             const name = d.properties.name || d.properties.NAME;
             const code = d.properties.postal || d.properties.ISO_A3;
@@ -166,47 +249,6 @@ Promise.all([
         })
         .on('mouseout', () => {
             tooltip.style('visibility', 'hidden');
-        });
-        
-    // Draw bounds
-    const boundFeatures = mapType === 'us'
-        ? stateBounds.features
-        : hasHighlightedStates
-            ? [...countryBounds.features.filter(f => f.properties.ISO_A3 !== 'USA'), ...stateBounds.features]
-            : countryBounds.features;
-        
-    boundsLayer.selectAll('path')
-        .data(boundFeatures)
-        .enter()
-        .append('path')
-        .attr('d', path)
-        .attr('fill', 'none')
-        .attr('stroke', '#F9F5F1')
-        .attr('stroke-width', '1');
-        
-    // Add labels
-    labelsLayer.selectAll('text')
-        .data(features)
-        .enter()
-        .append('text')
-        .attr('transform', d => {
-            const centroid = path.centroid(d);
-            if (isNaN(centroid[0]) || isNaN(centroid[1])) {
-                console.error('Invalid centroid for feature:', d);
-                return null;
-            }
-            return \`translate(\${centroid})\`;
-        })
-        .attr('text-anchor', 'middle')
-        .attr('dy', '.35em')
-        .style('font-size', '10px')
-        .style('fill', '#333')
-        .style('font-weight', 'bold')
-        .style('pointer-events', 'none')
-        .text(d => {
-            const code = d.properties.postal || d.properties.ISO_A3;
-            // Only show label if region is highlighted
-            return highlightColors[code] ? (d.properties.name || d.properties.NAME) : '';
         });
 }).catch(error => {
     console.error('Error loading GeoJSON:', error);
@@ -241,7 +283,10 @@ export async function exportBundle(container) {
             defaultFill: currentMapData.defaultFill,
             mapType: currentMapData.mapType,
             labels: currentMapData.labels,
-            states: currentMapData.states
+            states: currentMapData.states,
+            cities: currentMapData.cities,
+            showLabels: currentMapData.showLabels,
+            borderColor: currentMapData.borderColor
         };
         
         src.file('visualization.js', generateVisualizationCode(mapData));
@@ -250,20 +295,24 @@ export async function exportBundle(container) {
         const data = zip.folder('data');
         
         // Add GeoJSON files
-        const [countries, states, countryBounds, stateBounds] = await Promise.all([
+        const [countries, states, countryBounds, stateBounds, cities, disputedBounds] = await Promise.all([
             fetch('/geojson/countries.geojson').then(r => r.json()),
             fetch('/geojson/US_states.geojson').then(r => r.json()),
             fetch('/geojson/country_bounds.geojson').then(r => r.json()),
-            fetch('/geojson/US_bounds.geojson').then(r => r.json())
+            fetch('/geojson/US_bounds.geojson').then(r => r.json()),
+            fetch('/geojson/cities.geojson').then(r => r.json()),
+            fetch('/geojson/country_disputed_bounds.geojson').then(r => r.json())
         ]);
         
         data.file('countries.geojson', JSON.stringify(countries));
         data.file('US_states.geojson', JSON.stringify(states));
         data.file('country_bounds.geojson', JSON.stringify(countryBounds));
         data.file('US_bounds.geojson', JSON.stringify(stateBounds));
+        data.file('cities.geojson', JSON.stringify(cities));
+        data.file('country_disputed_bounds.geojson', JSON.stringify(disputedBounds));
         
-        // Add README
-        data.file('README.md', `# Testing the bundle
+        // Add README to root
+        zip.file('README.md', `# Testing the bundle
 
 To test the bundle, navigate to the folder and run a simple server with Python:
 

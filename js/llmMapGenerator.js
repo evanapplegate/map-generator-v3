@@ -18,7 +18,8 @@ AVAILABLE GEOJSON FILES AND THEIR FIELDS:
    - US_bounds.geojson: US state boundaries
 
 4. city files:
- - cities.geojson: field NAME has the full name; you'll have to do some unicode handling, if user asks for "Sao Paulo," the file has NAME = "São Paulo", so you'll mark it "São Paulo". This also has field "ADM0NAME" for the country so you can disambiguate; if user asks for "Sao Paulo, Brazil" just mark the city name "São Paulo"
+   - cities.geojson: field NAME has the city name; do some unicode handling, if user asks for "Sao Paulo," the file has NAME = "São Paulo", so you'll mark it "São Paulo". This also has field "ADM0NAME" for the country in which the city is located so you can disambiguate.
+   - if user asks for "Sao Paulo, Brazil" just mark the city name "São Paulo"
 
 REGION HANDLING:
 - For world maps: Only include US states if explicitly mentioned
@@ -51,7 +52,12 @@ The JSON must follow this format:
     "postalCode": "#hexColor"
   },
   "borderColor": "#hexColor",
-  "showLabels": boolean
+  "showLabels": boolean,
+  "cities": [
+    {
+      "name": "City Name"
+    }
+  ]
 }`;
 
 const MAX_RETRIES = 3;

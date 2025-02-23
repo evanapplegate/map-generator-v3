@@ -1,42 +1,22 @@
 import { log } from './logger.js';
 
 /**
- * Load GeoJSON data for map
- * @param {string} type - Map type ('us' or 'world')
- * @param {Object} mapData - Map configuration data
+ * Load GeoJSON data
+ * @param {string} path - Path to GeoJSON file
  * @returns {Promise<Object>} GeoJSON data
  */
-async function loadGeoJSON(type, mapData) {
-    log('D3', 'Loading GeoJSON', { type });
+async function loadGeoJSON(path) {
+    log('D3', 'Loading GeoJSON', { type: path });
     
-    // Always load both datasets to handle mixed queries
-    const [countries, states] = await Promise.all([
-        fetch('/geojson/countries.geojson').then(r => r.json()),
-        fetch('/geojson/US_states.geojson').then(r => r.json())
-    ]);
-    
-    // For US maps, only return states
-    // For world maps or mixed queries, merge features
-    if (type === 'us') {
-        return states;
-    } else {
-        // Find any US states that are highlighted
-        const hasHighlightedStates = mapData.states?.some(s => 
-            /^[A-Z]{2}$/.test(s.postalCode) && mapData.highlightColors?.[s.postalCode]
-        );
-        
-        if (hasHighlightedStates) {
-            // Merge US states with countries, excluding USA from countries
-            const nonUSACountries = countries.features.filter(f => 
-                f.properties.ISO_A3 !== 'USA'
-            );
-            return {
-                type: 'FeatureCollection',
-                features: [...nonUSACountries, ...states.features]
-            };
+    try {
+        const response = await fetch(path);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
-        return countries;
+        return await response.json();
+    } catch (error) {
+        log('D3', 'Error loading GeoJSON', { error, path });
+        throw error;
     }
 }
 
@@ -49,8 +29,8 @@ async function loadGeoJSON(type, mapData) {
 async function loadBoundsGeoJSON(type, mapData) {
     // Always load both datasets to handle mixed queries
     const [countryBounds, stateBounds] = await Promise.all([
-        fetch('/geojson/country_bounds.geojson').then(r => r.json()),
-        fetch('/geojson/US_bounds.geojson').then(r => r.json())
+        loadGeoJSON('/geojson/country_bounds.geojson'),
+        loadGeoJSON('/geojson/US_bounds.geojson')
     ]);
     
     // For US maps, only return state bounds
@@ -90,11 +70,21 @@ export async function renderMap(container, mapData) {
         // Clear container
         container.innerHTML = '';
         
-        // Load GeoJSON
-        const [geoData, boundsData] = await Promise.all([
-            loadGeoJSON(mapData.mapType, mapData),
-            loadBoundsGeoJSON(mapData.mapType, mapData)
-        ]);
+        // Load GeoJSON data
+        const [countries, states, bounds, citiesData, disputedBounds] = await Promise.all([
+            loadGeoJSON('/geojson/countries.geojson'),
+            loadGeoJSON('/geojson/US_states.geojson'),
+            loadGeoJSON(mapData.mapType === 'us' ? '/geojson/US_bounds.geojson' : '/geojson/country_bounds.geojson'),
+            loadGeoJSON('/geojson/cities.geojson'),
+            mapData.mapType === 'world' ? loadGeoJSON('/geojson/country_disputed_bounds.geojson') : null
+        ]).catch(error => {
+            log('D3', 'Error loading GeoJSON', { error });
+            throw error;
+        });
+
+        if (!countries?.features || !states?.features || !bounds?.features || !citiesData?.features) {
+            throw new Error('Failed to load one or more GeoJSON files');
+        }
         
         // Set dimensions
         const width = container.clientWidth;
@@ -113,7 +103,10 @@ export async function renderMap(container, mapData) {
         // Create layers
         const regionsLayer = svg.append('g').attr('id', 'regions-layer');
         const boundsLayer = svg.append('g').attr('id', 'bounds-layer');
-        const labelsLayer = svg.append('g').attr('id', 'labels-layer');
+        const disputedBoundsLayer = svg.append('g').attr('id', 'disputed_bounds');
+        const cityDotsLayer = svg.append('g').attr('id', 'city-dots');
+        const cityLabelsLayer = svg.append('g').attr('id', 'city-labels');
+        const countryLabelsLayer = svg.append('g').attr('id', 'country-labels');
         
         // Create projection
         const projection = mapData.mapType === 'us' 
@@ -140,7 +133,7 @@ export async function renderMap(container, mapData) {
         
         // Draw regions
         regionsLayer.selectAll('path')
-            .data(geoData.features)
+            .data(mapData.mapType === 'us' ? states.features : countries.features)
             .enter()
             .append('path')
             .attr('d', path)
@@ -167,43 +160,75 @@ export async function renderMap(container, mapData) {
             
         // Draw bounds
         boundsLayer.selectAll('path')
-            .data(boundsData.features)
-            .enter()
-            .append('path')
+            .data(bounds.features)
+            .join('path')
             .attr('d', path)
             .attr('fill', 'none')
             .attr('stroke', '#F9F5F1')
             .attr('stroke-width', '1');
             
-        // Add labels (always show for highlighted regions)
-        labelsLayer.selectAll('text')
-            .data(geoData.features)
-            .enter()
-            .append('text')
-            .attr('transform', d => {
-                const centroid = path.centroid(d);
-                if (isNaN(centroid[0]) || isNaN(centroid[1])) {
-                    log('D3', 'Invalid centroid', { feature: d });
-                    return null;
-                }
-                return `translate(${centroid})`;
-            })
-            .attr('text-anchor', 'middle')
-            .attr('dy', '.35em')
-            .style('font-size', '10px')
-            .style('fill', '#333')
-            .style('font-weight', 'bold')
-            .style('pointer-events', 'none')
-            .text(d => {
-                const code = d.properties.postal || d.properties.ISO_A3;
-                
-                // Show label if region is highlighted
-                if (mapData.highlightColors[code]) {
-                    return d.properties.name || d.properties.NAME;
-                }
-                return '';
-            });
+        // Draw disputed bounds for world maps
+        if (mapData.mapType === 'world' && disputedBounds?.features) {
+            disputedBoundsLayer.selectAll('path')
+                .data(disputedBounds.features)
+                .join('path')
+                .attr('d', path)
+                .attr('fill', 'none')
+                .attr('stroke', '#F9F5F1')
+                .attr('stroke-width', '1')
+                .attr('stroke-dasharray', '1,1');
+        }
             
+        // Add cities and labels
+        if (mapData.cities) {
+            const requestedCities = citiesData.features.filter(city => 
+                mapData.cities.some(c => city.properties.NAME === c.name)
+            );
+            
+            // City dots
+            cityDotsLayer.selectAll('circle')
+               .data(requestedCities)
+               .join('circle')
+               .attr('cx', d => projection(d.geometry.coordinates)[0])
+               .attr('cy', d => projection(d.geometry.coordinates)[1])
+               .attr('r', 1)
+               .attr('fill', '#000')
+               .attr('stroke', 'none');
+               
+            // City labels
+            cityLabelsLayer.selectAll('text')
+               .data(requestedCities)
+               .join('text')
+               .attr('x', d => projection(d.geometry.coordinates)[0] + 3)
+               .attr('y', d => projection(d.geometry.coordinates)[1])
+               .text(d => d.properties.NAME)
+               .attr('font-size', '8px')
+               .attr('fill', '#000000')
+               .style('font-weight', 'normal');
+        }
+        
+        // Add country/state labels
+        if (mapData.showLabels) {
+            const features = mapData.mapType === 'us' ? states.features : countries.features;
+            countryLabelsLayer.selectAll('text')
+                .data(features)
+                .join('text')
+                .attr('x', d => path.centroid(d)[0])
+                .attr('y', d => path.centroid(d)[1])
+                .text(d => {
+                    const code = d.properties.postal || d.properties.ISO_A3;
+                    return mapData.highlightColors[code] ? (d.properties.name || d.properties.NAME) : '';
+                })
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '8px')
+                .attr('fill', '#000000')
+                .style('font-weight', 'bold')
+                .style('display', d => {
+                    const code = d.properties.postal || d.properties.ISO_A3;
+                    return mapData.highlightColors[code] ? 'block' : 'none';
+                });
+        }
+        
         log('D3', 'Map render complete');
     } catch (error) {
         log('D3', 'Error rendering map', { error });
