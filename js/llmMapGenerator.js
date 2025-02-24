@@ -35,6 +35,9 @@ COLOR PREFERENCES:
 - Think 1977 Sunset Magazine aesthetic
 - Aim for colors that are distinguishable but harmonious.
 
+FACT-FINDING:
+- If user asks for groups of countries like the EU or ASEAN, check to see which nations are members first. Always check!
+
 RESPOND ONLY WITH A VALID JSON OBJECT. NO OTHER TEXT OR FORMATTING.
 
 The JSON must follow this format:
