@@ -72,56 +72,21 @@ const CSS = `
  */
 function generateVisualizationCode(mapData) {
     return `
-// Initialize map
-const container = document.getElementById('map');
-const width = container.clientWidth;
-const height = container.clientHeight;
-const aspect = width / height;
+(async function() {
+    // Initialize map
+    const container = document.getElementById('map');
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const aspect = width / height;
 
-// Map data
-const highlightColors = ${JSON.stringify(mapData.highlightColors)};
-const defaultFill = '${mapData.defaultFill}';
-const mapType = '${mapData.mapType}';
-const stateList = ${JSON.stringify(mapData.states || [])};
-const cities = ${JSON.stringify(mapData.cities || [])};
-const showLabels = ${mapData.showLabels};
-const borderColor = '${mapData.borderColor}';
-
-// Create SVG
-const svg = d3.select('#map')
-    .append('svg')
-    .attr('width', '100%')
-    .attr('height', '100%')
-    .attr('preserveAspectRatio', 'xMidYMid meet')
-    .attr('viewBox', \`0 0 \${width} \${height}\`)
-    .style('background-color', 'inherit');
-
-// Create layers
-const regionsLayer = svg.append('g').attr('id', 'regions-layer');
-const boundsLayer = svg.append('g').attr('id', 'bounds-layer');
-const stateBoundsLayer = svg.append('g').attr('id', 'state-bounds-layer');
-const disputedBoundsLayer = svg.append('g').attr('id', 'disputed_bounds');
-const cityDotsLayer = svg.append('g').attr('id', 'city-dots');
-const cityLabelsLayer = svg.append('g').attr('id', 'city-labels');
-const countryLabelsLayer = svg.append('g').attr('id', 'country-labels');
-
-// Create tooltip
-const tooltip = d3.select('body')
-    .append('div')
-    .attr('class', 'tooltip');
-
-// Load GeoJSON data
-Promise.all([
-    d3.json('src/geojson/countries.geojson'),
-    d3.json('src/geojson/US_states.geojson'),
-    d3.json('src/geojson/country_bounds.geojson'),
-    d3.json('src/geojson/US_bounds.geojson'),
-    d3.json('src/geojson/cities.geojson'),
-    mapType === 'world' ? d3.json('src/geojson/country_disputed_bounds.geojson') : Promise.resolve(null)
-]).then(([countries, states, countryBounds, stateBounds, citiesData, disputedBounds]) => {
-    if (!countries?.features || !states?.features || !countryBounds?.features || !stateBounds?.features || !citiesData?.features) {
-        throw new Error('Failed to load one or more GeoJSON files');
-    }
+    // Map data
+    const highlightColors = ${JSON.stringify(mapData.highlightColors)};
+    const defaultFill = '${mapData.defaultFill}';
+    const mapType = '${mapData.mapType}';
+    const stateList = ${JSON.stringify(mapData.states || [])};
+    const cities = ${JSON.stringify(mapData.cities || [])};
+    const showLabels = ${mapData.showLabels};
+    const borderColor = '${mapData.borderColor}';
 
     // Create projection based on map type
     const projection = mapType === 'us'
@@ -132,21 +97,94 @@ Promise.all([
             .scale(Math.min(width / 4.6, height / 2.9))
             .translate([width / 2, height / 2])
             .rotate([-11, 0]);  // Rotate globe 11° east to wrap Russia around
-        
+
     // Create path generator
     const path = d3.geoPath().projection(projection);
-    
+
+    // Load GeoJSON data
+    const countries = await fetch('src/geojson/countries.geojson').then(r => r.json());
+    const states = await fetch('src/geojson/US_states.geojson').then(r => r.json());
+    const countryBounds = await fetch('src/geojson/country_bounds.geojson').then(r => r.json());
+    const stateBounds = await fetch('src/geojson/US_bounds.geojson').then(r => r.json());
+    const citiesData = await fetch('src/geojson/cities.geojson').then(r => r.json());
+    let disputedBounds = null;
+    if (mapType === 'world') {
+        disputedBounds = await fetch('src/geojson/country_disputed_bounds.geojson').then(r => r.json());
+    }
+
+    // Create SVG with Adobe-specific namespace declarations
+    const svg = d3.select('#map')
+        .append('svg')
+        .attr('width', '100%')
+        .attr('height', '100%')
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .attr('viewBox', \`0 0 \${width} \${height}\`)
+        .attr('xmlns', 'http://www.w3.org/2000/svg')
+        .attr('xmlns:i', 'http://ns.adobe.com/AdobeIllustrator/10.0/')
+        .attr('xmlns:x', 'adobe:ns:meta/')
+        .attr('version', '1.1');
+
+    // Create layers with Adobe-specific metadata
+    const regionsLayer = svg.append('g')
+        .attr('id', 'regions-layer')
+        .attr('i:layer', 'yes')
+        .attr('i:dimmedPercent', '0')
+        .attr('i:rgbTrio', '#4F008000FFFF')
+        .attr('i:layerType', 'layer');
+
+    const boundsLayer = svg.append('g')
+        .attr('id', 'bounds-layer')
+        .attr('i:layer', 'yes')
+        .attr('i:dimmedPercent', '0')
+        .attr('i:rgbTrio', '#4F008000FFFF')
+        .attr('i:layerType', 'layer');
+
+    const stateBoundsLayer = svg.append('g')
+        .attr('id', 'state-bounds-layer')
+        .attr('i:layer', 'yes')
+        .attr('i:dimmedPercent', '0')
+        .attr('i:rgbTrio', '#4F008000FFFF')
+        .attr('i:layerType', 'layer');
+
+    const disputedBoundsLayer = svg.append('g')
+        .attr('id', 'disputed_bounds')
+        .attr('i:layer', 'yes')
+        .attr('i:dimmedPercent', '0')
+        .attr('i:rgbTrio', '#4F008000FFFF')
+        .attr('i:layerType', 'layer');
+
+    const cityDotsLayer = svg.append('g')
+        .attr('id', 'city-dots')
+        .attr('i:layer', 'yes')
+        .attr('i:dimmedPercent', '0')
+        .attr('i:rgbTrio', '#4F008000FFFF')
+        .attr('i:layerType', 'layer');
+
+    const cityLabelsLayer = svg.append('g')
+        .attr('id', 'city-labels')
+        .attr('i:layer', 'yes')
+        .attr('i:dimmedPercent', '0')
+        .attr('i:rgbTrio', '#4F008000FFFF')
+        .attr('i:layerType', 'layer');
+
+    const countryLabelsLayer = svg.append('g')
+        .attr('id', 'country-labels')
+        .attr('i:layer', 'yes')
+        .attr('i:dimmedPercent', '0')
+        .attr('i:rgbTrio', '#4F008000FFFF')
+        .attr('i:layerType', 'layer');
+
     // For US maps, only use state features
     // For world maps, check if we need to include US states
     const hasHighlightedStates = stateList?.some(s => 
         /^[A-Z]{2}$/.test(s.postalCode) && highlightColors?.[s.postalCode]
     );
-    
+        
     const features = mapType === 'us' ? states.features :
         hasHighlightedStates ? 
             [...countries.features.filter(f => f.properties.ISO_A3 !== 'USA'), ...states.features] :
             countries.features;
-            
+
     regionsLayer.selectAll('path')
         .data(features)
         .join('path')
@@ -156,6 +194,7 @@ Promise.all([
             return highlightColors[code] || defaultFill;
         })
         .attr('stroke', 'none');  // Remove strokes from regions
+
     boundsLayer.selectAll('path')
         .data(mapType === 'us' ? stateBounds.features : countryBounds.features)
         .join('path')
@@ -163,7 +202,7 @@ Promise.all([
         .attr('fill', 'none')
         .attr('stroke', '#F9F5F1')
         .attr('stroke-width', '1');
-        
+            
     // Draw state bounds in world view
     if (mapType === 'world' && hasHighlightedStates) {
         stateBoundsLayer.selectAll('path')
@@ -192,46 +231,42 @@ Promise.all([
         const requestedCities = citiesData.features.filter(city => 
             cities.some(c => city.properties.NAME === c.name)
         );
-        
+            
         // City dots
         cityDotsLayer.selectAll('circle')
-           .data(requestedCities)
-           .join('circle')
-           .attr('cx', d => projection(d.geometry.coordinates)[0])
-           .attr('cy', d => projection(d.geometry.coordinates)[1])
-           .attr('r', 1)
-           .attr('fill', '#000')
-           .attr('stroke', 'none');
-           
+            .data(requestedCities)
+            .join('circle')
+            .attr('cx', d => projection(d.geometry.coordinates)[0])
+            .attr('cy', d => projection(d.geometry.coordinates)[1])
+            .attr('r', 1)
+            .attr('fill', '#000')
+            .attr('stroke', 'none');
+               
         // City labels
         cityLabelsLayer.selectAll('text')
-           .data(requestedCities)
-           .join('text')
-           .attr('x', d => projection(d.geometry.coordinates)[0] + 3)
-           .attr('y', d => projection(d.geometry.coordinates)[1])
-           .text(d => d.properties.NAME)
-           .attr('font-size', '8px')
-           .attr('fill', '#000000')
-           .style('font-weight', 'normal');
+            .data(requestedCities)
+            .join('text')
+            .attr('x', d => projection(d.geometry.coordinates)[0] + 3)
+            .attr('y', d => projection(d.geometry.coordinates)[1])
+            .text(d => d.properties.NAME)
+            .attr('font-size', '8px')
+            .attr('fill', '#000000')
+            .style('font-weight', 'normal');
     }
-    
+        
     // Add country/state labels
     if (showLabels) {
-        // For world maps, include both highlighted countries and states
-        const hasHighlightedStates = stateList?.some(s => 
-            /^[A-Z]{2}$/.test(s.postalCode) && highlightColors?.[s.postalCode]
-        );
-        
-        const features = mapType === 'us' ? states.features :
-            hasHighlightedStates ? 
-                [...countries.features.filter(f => f.properties.ISO_A3 !== 'USA'), ...states.features] :
-                countries.features;
-
         countryLabelsLayer.selectAll('text')
             .data(features)
             .join('text')
-            .attr('x', d => path.centroid(d)[0])
-            .attr('y', d => path.centroid(d)[1])
+            .attr('x', d => {
+                const centroid = path.centroid(d);
+                return !isNaN(centroid[0]) ? centroid[0] : 0;
+            })
+            .attr('y', d => {
+                const centroid = path.centroid(d);
+                return !isNaN(centroid[1]) ? centroid[1] : 0;
+            })
             .text(d => {
                 const code = d.properties.postal || d.properties.ISO_A3;
                 return highlightColors[code] ? (d.properties.name || d.properties.NAME) : '';
@@ -242,16 +277,21 @@ Promise.all([
             .style('font-weight', 'bold')
             .style('display', d => {
                 const code = d.properties.postal || d.properties.ISO_A3;
-                return highlightColors[code] ? 'block' : 'none';
+                const centroid = path.centroid(d);
+                return highlightColors[code] && !isNaN(centroid[0]) && !isNaN(centroid[1]) ? 'block' : 'none';
             });
     }
-        
+            
     // Add tooltip
+    const tooltip = d3.select('body')
+        .append('div')
+        .attr('class', 'tooltip');
+
     regionsLayer.selectAll('path')
         .on('mouseover', (event, d) => {
             const name = d.properties.name || d.properties.NAME;
             const code = d.properties.postal || d.properties.ISO_A3;
-            
+                
             tooltip
                 .style('visibility', 'visible')
                 .html(\`<strong>\${name}</strong>\`);
@@ -264,8 +304,8 @@ Promise.all([
         .on('mouseout', () => {
             tooltip.style('visibility', 'hidden');
         });
-}).catch(error => {
-    console.error('Error loading GeoJSON:', error);
+})().catch(error => {
+    console.error('Error:', error);
     document.getElementById('map').innerHTML = \`Error: \${error.message}\`;
 });`;
 }
@@ -310,14 +350,15 @@ export async function exportBundle(container, mapData) {
         const geojsonDir = zip.folder('src/geojson');
         
         // Load and add GeoJSON files
-        const [countriesGeojson, statesGeojson, countryBoundsGeojson, stateBoundsGeojson, citiesGeojson, disputedBoundsGeojson] = await Promise.all([
-            fetch('/geojson/countries.geojson').then(r => r.json()),
-            fetch('/geojson/US_states.geojson').then(r => r.json()),
-            fetch('/geojson/country_bounds.geojson').then(r => r.json()),
-            fetch('/geojson/US_bounds.geojson').then(r => r.json()),
-            fetch('/geojson/cities.geojson').then(r => r.json()),
-            mapData.mapType === 'world' ? fetch('/geojson/country_disputed_bounds.geojson').then(r => r.json()) : Promise.resolve(null)
-        ]);
+        const countriesGeojson = await fetch('/geojson/countries.geojson').then(r => r.json());
+        const statesGeojson = await fetch('/geojson/US_states.geojson').then(r => r.json());
+        const countryBoundsGeojson = await fetch('/geojson/country_bounds.geojson').then(r => r.json());
+        const stateBoundsGeojson = await fetch('/geojson/US_bounds.geojson').then(r => r.json());
+        const citiesGeojson = await fetch('/geojson/cities.geojson').then(r => r.json());
+        let disputedBoundsGeojson = null;
+        if (mapData.mapType === 'world') {
+            disputedBoundsGeojson = await fetch('/geojson/country_disputed_bounds.geojson').then(r => r.json());
+        }
         
         // Add GeoJSON files
         geojsonDir.file('countries.geojson', JSON.stringify(countriesGeojson));
@@ -325,7 +366,9 @@ export async function exportBundle(container, mapData) {
         geojsonDir.file('country_bounds.geojson', JSON.stringify(countryBoundsGeojson));
         geojsonDir.file('US_bounds.geojson', JSON.stringify(stateBoundsGeojson));
         geojsonDir.file('cities.geojson', JSON.stringify(citiesGeojson));
-        geojsonDir.file('country_disputed_bounds.geojson', JSON.stringify(disputedBoundsGeojson));
+        if (disputedBoundsGeojson) {
+            geojsonDir.file('country_disputed_bounds.geojson', JSON.stringify(disputedBoundsGeojson));
+        }
         
         // Add README to root
         zip.file('README.md', `# Testing the bundle

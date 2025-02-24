@@ -92,24 +92,82 @@ export async function renderMap(container, mapData) {
         const height = container.clientHeight;
         const aspect = width / height;
         
-        // Create SVG with layers
+        // Create SVG with Adobe-specific namespace declarations
         const svg = d3.select(container)
             .append('svg')
             .attr('width', '100%')
             .attr('height', '100%')
             .attr('preserveAspectRatio', 'xMidYMid meet')
             .attr('viewBox', `0 0 ${width} ${height}`)
-            .style('background-color', '#F9F5F1');
+            .attr('xmlns', 'http://www.w3.org/2000/svg')
+            .attr('xmlns:i', 'http://ns.adobe.com/AdobeIllustrator/10.0/')
+            .attr('xmlns:x', 'adobe:ns:meta/')
+            .attr('version', '1.1');
+
+        // Create layers with Adobe-specific metadata
+        const regionsLayer = svg.append('g')
+            .attr('id', 'regions-layer')
+            .attr('i:layer', 'yes')
+            .attr('i:dimmedPercent', '0')
+            .attr('i:rgbTrio', '#4F008000FFFF')
+            .attr('i:layerType', 'layer')
+            .attr('inkscape:groupmode', 'layer')
+            .attr('inkscape:label', 'Regions');
+
+        const boundsLayer = svg.append('g')
+            .attr('id', 'bounds-layer')
+            .attr('i:layer', 'yes')
+            .attr('i:dimmedPercent', '0')
+            .attr('i:rgbTrio', '#4F008000FFFF')
+            .attr('i:layerType', 'layer')
+            .attr('inkscape:groupmode', 'layer')
+            .attr('inkscape:label', 'Boundaries');
+
+        const stateBoundsLayer = svg.append('g')
+            .attr('id', 'state-bounds-layer')
+            .attr('i:layer', 'yes')
+            .attr('i:dimmedPercent', '0')
+            .attr('i:rgbTrio', '#4F008000FFFF')
+            .attr('i:layerType', 'layer')
+            .attr('inkscape:groupmode', 'layer')
+            .attr('inkscape:label', 'State Boundaries');
+
+        const disputedBoundsLayer = svg.append('g')
+            .attr('id', 'disputed_bounds')
+            .attr('i:layer', 'yes')
+            .attr('i:dimmedPercent', '0')
+            .attr('i:rgbTrio', '#4F008000FFFF')
+            .attr('i:layerType', 'layer')
+            .attr('inkscape:groupmode', 'layer')
+            .attr('inkscape:label', 'Disputed Boundaries');
+
+        const cityDotsLayer = svg.append('g')
+            .attr('id', 'city-dots')
+            .attr('i:layer', 'yes')
+            .attr('i:dimmedPercent', '0')
+            .attr('i:rgbTrio', '#4F008000FFFF')
+            .attr('i:layerType', 'layer')
+            .attr('inkscape:groupmode', 'layer')
+            .attr('inkscape:label', 'City Dots');
+
+        const cityLabelsLayer = svg.append('g')
+            .attr('id', 'city-labels')
+            .attr('i:layer', 'yes')
+            .attr('i:dimmedPercent', '0')
+            .attr('i:rgbTrio', '#4F008000FFFF')
+            .attr('i:layerType', 'layer')
+            .attr('inkscape:groupmode', 'layer')
+            .attr('inkscape:label', 'City Labels');
+
+        const countryLabelsLayer = svg.append('g')
+            .attr('id', 'country-labels')
+            .attr('i:layer', 'yes')
+            .attr('i:dimmedPercent', '0')
+            .attr('i:rgbTrio', '#4F008000FFFF')
+            .attr('i:layerType', 'layer')
+            .attr('inkscape:groupmode', 'layer')
+            .attr('inkscape:label', 'Country/State Labels');
             
-        // Create layers
-        const regionsLayer = svg.append('g').attr('id', 'regions-layer');
-        const boundsLayer = svg.append('g').attr('id', 'bounds-layer');
-        const stateBoundsLayer = svg.append('g').attr('id', 'state-bounds-layer');
-        const disputedBoundsLayer = svg.append('g').attr('id', 'disputed_bounds');
-        const cityDotsLayer = svg.append('g').attr('id', 'city-dots');
-        const cityLabelsLayer = svg.append('g').attr('id', 'city-labels');
-        const countryLabelsLayer = svg.append('g').attr('id', 'country-labels');
-        
         // Create projection
         const projection = mapData.mapType === 'us' 
             ? d3.geoAlbersUsa()
@@ -209,24 +267,24 @@ export async function renderMap(container, mapData) {
             
             // City dots
             cityDotsLayer.selectAll('circle')
-               .data(requestedCities)
-               .join('circle')
-               .attr('cx', d => projection(d.geometry.coordinates)[0])
-               .attr('cy', d => projection(d.geometry.coordinates)[1])
-               .attr('r', 1)
-               .attr('fill', '#000')
-               .attr('stroke', 'none');
+                .data(requestedCities)
+                .join('circle')
+                .attr('cx', d => projection(d.geometry.coordinates)[0])
+                .attr('cy', d => projection(d.geometry.coordinates)[1])
+                .attr('r', 1)
+                .attr('fill', '#000')
+                .attr('stroke', 'none');
                
             // City labels
             cityLabelsLayer.selectAll('text')
-               .data(requestedCities)
-               .join('text')
-               .attr('x', d => projection(d.geometry.coordinates)[0] + 3)
-               .attr('y', d => projection(d.geometry.coordinates)[1])
-               .text(d => d.properties.NAME)
-               .attr('font-size', '8px')
-               .attr('fill', '#000000')
-               .style('font-weight', 'normal');
+                .data(requestedCities)
+                .join('text')
+                .attr('x', d => projection(d.geometry.coordinates)[0] + 3)
+                .attr('y', d => projection(d.geometry.coordinates)[1])
+                .text(d => d.properties.NAME)
+                .attr('font-size', '8px')
+                .attr('fill', '#000000')
+                .style('font-weight', 'normal');
         }
         
         // Add country/state labels
@@ -244,8 +302,14 @@ export async function renderMap(container, mapData) {
             countryLabelsLayer.selectAll('text')
                 .data(features)
                 .join('text')
-                .attr('x', d => path.centroid(d)[0])
-                .attr('y', d => path.centroid(d)[1])
+                .attr('x', d => {
+                    const centroid = path.centroid(d);
+                    return !isNaN(centroid[0]) ? centroid[0] : 0;
+                })
+                .attr('y', d => {
+                    const centroid = path.centroid(d);
+                    return !isNaN(centroid[1]) ? centroid[1] : 0;
+                })
                 .text(d => {
                     const code = d.properties.postal || d.properties.ISO_A3;
                     return mapData.highlightColors[code] ? (d.properties.name || d.properties.NAME) : '';
@@ -256,7 +320,8 @@ export async function renderMap(container, mapData) {
                 .style('font-weight', 'bold')
                 .style('display', d => {
                     const code = d.properties.postal || d.properties.ISO_A3;
-                    return mapData.highlightColors[code] ? 'block' : 'none';
+                    const centroid = path.centroid(d);
+                    return mapData.highlightColors[code] && !isNaN(centroid[0]) && !isNaN(centroid[1]) ? 'block' : 'none';
                 });
         }
         
