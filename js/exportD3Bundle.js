@@ -229,9 +229,13 @@ function generateVisualizationCode(mapData) {
     // Add cities and labels
     if (cities) {
         const requestedCities = citiesData.features.filter(city => 
-            cities.some(c => city.properties.NAME === c.name) &&
-            // For US maps, only show US cities
-            (mapType === 'us' ? city.properties.COUNTRY === 'United States' : true)
+            cities.some(c => {
+                // For US maps, only show US cities
+                if (mapType === 'us' && city.properties.ADM0NAME !== 'United States of America') {
+                    return false;
+                }
+                return city.properties.NAME === c.name;
+            })
         );
             
         // City dots

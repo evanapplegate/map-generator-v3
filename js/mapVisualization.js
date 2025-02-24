@@ -262,9 +262,13 @@ export async function renderMap(container, mapData) {
         // Add cities and labels
         if (mapData.cities) {
             const requestedCities = citiesData.features.filter(city => 
-                mapData.cities.some(c => city.properties.NAME === c.name) &&
-                // For US maps, only show US cities
-                (mapData.mapType === 'us' ? city.properties.COUNTRY === 'United States' : true)
+                mapData.cities.some(c => {
+                    // For US maps, only show US cities
+                    if (mapData.mapType === 'us' && city.properties.ADM0NAME !== 'United States of America') {
+                        return false;
+                    }
+                    return city.properties.NAME === c.name;
+                })
             );
             
             // City dots
