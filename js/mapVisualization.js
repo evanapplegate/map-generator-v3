@@ -29,8 +29,8 @@ async function loadGeoJSON(path) {
 async function loadBoundsGeoJSON(type, mapData) {
     // Always load both datasets to handle mixed queries
     const [countryBounds, stateBounds] = await Promise.all([
-        loadGeoJSON('/geojson/country_bounds.geojson'),
-        loadGeoJSON('/geojson/US_bounds.geojson')
+        loadGeoJSON('geojson/country_bounds.geojson'),
+        loadGeoJSON('geojson/US_bounds.geojson')
     ]);
     
     // For US maps, only return state bounds
@@ -71,18 +71,19 @@ export async function renderMap(container, mapData) {
         container.innerHTML = '';
         
         // Load GeoJSON data
-        const [countries, states, bounds, citiesData, disputedBounds] = await Promise.all([
-            loadGeoJSON('/geojson/countries.geojson'),
-            loadGeoJSON('/geojson/US_states.geojson'),
-            loadGeoJSON(mapData.mapType === 'us' ? '/geojson/US_bounds.geojson' : '/geojson/country_bounds.geojson'),
-            loadGeoJSON('/geojson/cities.geojson'),
-            mapData.mapType === 'world' ? loadGeoJSON('/geojson/country_disputed_bounds.geojson') : null
+        const [countries, states, countryBounds, stateBounds, citiesData, disputedBounds] = await Promise.all([
+            loadGeoJSON('geojson/countries.geojson'),
+            loadGeoJSON('geojson/US_states.geojson'),
+            loadGeoJSON('geojson/country_bounds.geojson'),
+            loadGeoJSON('geojson/US_bounds.geojson'),
+            loadGeoJSON('geojson/cities.geojson'),
+            mapData.mapType === 'world' ? loadGeoJSON('geojson/country_disputed_bounds.geojson') : null
         ]).catch(error => {
             log('D3', 'Error loading GeoJSON', { error });
             throw error;
         });
 
-        if (!countries?.features || !states?.features || !bounds?.features || !citiesData?.features) {
+        if (!countries?.features || !states?.features || !countryBounds?.features || !stateBounds?.features || !citiesData?.features) {
             throw new Error('Failed to load one or more GeoJSON files');
         }
         
@@ -103,6 +104,7 @@ export async function renderMap(container, mapData) {
         // Create layers
         const regionsLayer = svg.append('g').attr('id', 'regions-layer');
         const boundsLayer = svg.append('g').attr('id', 'bounds-layer');
+        const stateBoundsLayer = svg.append('g').attr('id', 'state-bounds-layer');
         const disputedBoundsLayer = svg.append('g').attr('id', 'disputed_bounds');
         const cityDotsLayer = svg.append('g').attr('id', 'city-dots');
         const cityLabelsLayer = svg.append('g').attr('id', 'city-labels');
@@ -115,7 +117,8 @@ export async function renderMap(container, mapData) {
                 .translate([width / 2, height / 2])
             : d3.geoEqualEarth()
                 .scale(Math.min(width / 4.6, height / 2.9))
-                .translate([width / 2, height / 2]);
+                .translate([width / 2, height / 2])
+                .rotate([-11, 0]);  // Rotate globe 11° east to wrap Russia around
         
         // Create path generator
         const path = d3.geoPath().projection(projection);
@@ -132,10 +135,18 @@ export async function renderMap(container, mapData) {
             .style('box-shadow', '0 2px 4px rgba(0,0,0,0.1)');
         
         // Draw regions
+        const hasHighlightedStates = mapData.states?.some(s => 
+            /^[A-Z]{2}$/.test(s.postalCode) && mapData.highlightColors?.[s.postalCode]
+        );
+        
+        const features = mapData.mapType === 'us' ? states.features :
+            hasHighlightedStates ? 
+                [...countries.features.filter(f => f.properties.ISO_A3 !== 'USA'), ...states.features] :
+                countries.features;
+                
         regionsLayer.selectAll('path')
-            .data(mapData.mapType === 'us' ? states.features : countries.features)
-            .enter()
-            .append('path')
+            .data(features)
+            .join('path')
             .attr('d', path)
             .attr('fill', d => {
                 const code = d.properties.postal || d.properties.ISO_A3;
@@ -160,12 +171,23 @@ export async function renderMap(container, mapData) {
             
         // Draw bounds
         boundsLayer.selectAll('path')
-            .data(bounds.features)
+            .data(mapData.mapType === 'us' ? stateBounds.features : countryBounds.features)
             .join('path')
             .attr('d', path)
             .attr('fill', 'none')
             .attr('stroke', '#F9F5F1')
             .attr('stroke-width', '1');
+            
+        // Draw state bounds in world view
+        if (mapData.mapType === 'world' && hasHighlightedStates) {
+            stateBoundsLayer.selectAll('path')
+                .data(stateBounds.features)
+                .join('path')
+                .attr('d', path)
+                .attr('fill', 'none')
+                .attr('stroke', '#F9F5F1')
+                .attr('stroke-width', '1');
+        }
             
         // Draw disputed bounds for world maps
         if (mapData.mapType === 'world' && disputedBounds?.features) {

@@ -102,6 +102,7 @@ const svg = d3.select('#map')
 // Create layers
 const regionsLayer = svg.append('g').attr('id', 'regions-layer');
 const boundsLayer = svg.append('g').attr('id', 'bounds-layer');
+const stateBoundsLayer = svg.append('g').attr('id', 'state-bounds-layer');
 const disputedBoundsLayer = svg.append('g').attr('id', 'disputed_bounds');
 const cityDotsLayer = svg.append('g').attr('id', 'city-dots');
 const cityLabelsLayer = svg.append('g').attr('id', 'city-labels');
@@ -114,13 +115,14 @@ const tooltip = d3.select('body')
 
 // Load GeoJSON data
 Promise.all([
-    d3.json('data/countries.geojson'),
-    d3.json('data/US_states.geojson'),
-    d3.json(mapType === 'us' ? 'data/US_bounds.geojson' : 'data/country_bounds.geojson'),
-    d3.json('data/cities.geojson'),
-    mapType === 'world' ? d3.json('data/country_disputed_bounds.geojson') : Promise.resolve(null)
-]).then(([countries, states, bounds, citiesData, disputedBounds]) => {
-    if (!countries || !states || !bounds || !citiesData) {
+    d3.json('src/geojson/countries.geojson'),
+    d3.json('src/geojson/US_states.geojson'),
+    d3.json('src/geojson/country_bounds.geojson'),
+    d3.json('src/geojson/US_bounds.geojson'),
+    d3.json('src/geojson/cities.geojson'),
+    mapType === 'world' ? d3.json('src/geojson/country_disputed_bounds.geojson') : Promise.resolve(null)
+]).then(([countries, states, countryBounds, stateBounds, citiesData, disputedBounds]) => {
+    if (!countries?.features || !states?.features || !countryBounds?.features || !stateBounds?.features || !citiesData?.features) {
         throw new Error('Failed to load one or more GeoJSON files');
     }
 
@@ -131,7 +133,8 @@ Promise.all([
             .translate([width / 2, height / 2])
         : d3.geoEqualEarth()
             .scale(Math.min(width / 4.6, height / 2.9))
-            .translate([width / 2, height / 2]);
+            .translate([width / 2, height / 2])
+            .rotate([-11, 0]);  // Rotate globe 11° east to wrap Russia around
         
     // Create path generator
     const path = d3.geoPath().projection(projection);
@@ -139,37 +142,42 @@ Promise.all([
     // For US maps, only use state features
     // For world maps, check if we need to include US states
     const hasHighlightedStates = stateList?.some(s => 
-        /^[A-Z]{2}$/.test(s.postalCode) && highlightColors[s.postalCode]
+        /^[A-Z]{2}$/.test(s.postalCode) && highlightColors?.[s.postalCode]
     );
     
-    const features = mapType === 'us' 
-        ? states.features 
-        : hasHighlightedStates
-            ? [...countries.features.filter(f => f.properties.ISO_A3 !== 'USA'), ...states.features]
-            : countries.features;
-    
-    // Draw regions
+    const features = mapType === 'us' ? states.features :
+        hasHighlightedStates ? 
+            [...countries.features.filter(f => f.properties.ISO_A3 !== 'USA'), ...states.features] :
+            countries.features;
+            
     regionsLayer.selectAll('path')
-        .data(mapType === 'us' ? states.features : countries.features)
-        .enter()
-        .append('path')
+        .data(features)
+        .join('path')
         .attr('d', path)
         .attr('fill', d => {
             const code = d.properties.postal || d.properties.ISO_A3;
             return highlightColors[code] || defaultFill;
         })
-        .attr('stroke', borderColor)
-        .attr('stroke-width', '0.5');
-
-    // Draw bounds
+        .attr('stroke', 'none');  // Remove strokes from regions
     boundsLayer.selectAll('path')
-        .data(bounds.features)
+        .data(mapType === 'us' ? stateBounds.features : countryBounds.features)
         .join('path')
         .attr('d', path)
         .attr('fill', 'none')
         .attr('stroke', '#F9F5F1')
         .attr('stroke-width', '1');
-            
+        
+    // Draw state bounds in world view
+    if (mapType === 'world' && hasHighlightedStates) {
+        stateBoundsLayer.selectAll('path')
+            .data(stateBounds.features)
+            .join('path')
+            .attr('d', path)
+            .attr('fill', 'none')
+            .attr('stroke', '#F9F5F1')
+            .attr('stroke-width', '1');
+    }
+
     // Draw disputed bounds for world maps
     if (mapType === 'world' && disputedBounds?.features) {
         disputedBoundsLayer.selectAll('path')
@@ -291,25 +299,26 @@ export async function exportBundle(container) {
         
         src.file('visualization.js', generateVisualizationCode(mapData));
         
-        // Create data directory
-        const data = zip.folder('data');
+        // Create src/geojson directory for GeoJSON files
+        const geojsonDir = zip.folder('src/geojson');
         
-        // Add GeoJSON files
-        const [countries, states, countryBounds, stateBounds, cities, disputedBounds] = await Promise.all([
+        // Load and add GeoJSON files
+        const [countriesGeojson, statesGeojson, countryBoundsGeojson, stateBoundsGeojson, citiesGeojson, disputedBoundsGeojson] = await Promise.all([
             fetch('/geojson/countries.geojson').then(r => r.json()),
             fetch('/geojson/US_states.geojson').then(r => r.json()),
             fetch('/geojson/country_bounds.geojson').then(r => r.json()),
             fetch('/geojson/US_bounds.geojson').then(r => r.json()),
             fetch('/geojson/cities.geojson').then(r => r.json()),
-            fetch('/geojson/country_disputed_bounds.geojson').then(r => r.json())
+            mapData.mapType === 'world' ? fetch('/geojson/country_disputed_bounds.geojson').then(r => r.json()) : Promise.resolve(null)
         ]);
         
-        data.file('countries.geojson', JSON.stringify(countries));
-        data.file('US_states.geojson', JSON.stringify(states));
-        data.file('country_bounds.geojson', JSON.stringify(countryBounds));
-        data.file('US_bounds.geojson', JSON.stringify(stateBounds));
-        data.file('cities.geojson', JSON.stringify(cities));
-        data.file('country_disputed_bounds.geojson', JSON.stringify(disputedBounds));
+        // Add GeoJSON files
+        geojsonDir.file('countries.geojson', JSON.stringify(countriesGeojson));
+        geojsonDir.file('US_states.geojson', JSON.stringify(statesGeojson));
+        geojsonDir.file('country_bounds.geojson', JSON.stringify(countryBoundsGeojson));
+        geojsonDir.file('US_bounds.geojson', JSON.stringify(stateBoundsGeojson));
+        geojsonDir.file('cities.geojson', JSON.stringify(citiesGeojson));
+        geojsonDir.file('country_disputed_bounds.geojson', JSON.stringify(disputedBoundsGeojson));
         
         // Add README to root
         zip.file('README.md', `# Testing the bundle
