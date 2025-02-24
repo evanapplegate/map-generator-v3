@@ -71,14 +71,13 @@ export async function renderMap(container, mapData) {
         container.innerHTML = '';
         
         // Load GeoJSON data
-        const [countries, states, countryBounds, stateBounds, citiesData, usCitiesData, disputedBounds] = await Promise.all([
-            loadGeoJSON('src/geojson/countries.geojson'),
-            loadGeoJSON('src/geojson/US_states.geojson'),
-            loadGeoJSON('src/geojson/country_bounds.geojson'),
-            loadGeoJSON('src/geojson/US_bounds.geojson'),
-            loadGeoJSON('src/geojson/cities.geojson'),
-            loadGeoJSON('src/geojson/us_cities.geojson'),
-            mapData.mapType === 'world' ? loadGeoJSON('src/geojson/country_disputed_bounds.geojson') : null
+        const [countries, states, countryBounds, stateBounds, citiesData, disputedBounds] = await Promise.all([
+            loadGeoJSON('geojson/countries.geojson'),
+            loadGeoJSON('geojson/US_states.geojson'),
+            loadGeoJSON('geojson/country_bounds.geojson'),
+            loadGeoJSON('geojson/US_bounds.geojson'),
+            loadGeoJSON('geojson/cities.geojson'),
+            mapData.mapType === 'world' ? loadGeoJSON('geojson/country_disputed_bounds.geojson') : null
         ]).catch(error => {
             log('D3', 'Error loading GeoJSON', { error });
             throw error;
@@ -262,9 +261,10 @@ export async function renderMap(container, mapData) {
             
         // Add cities and labels
         if (mapData.cities) {
-            const cityData = mapData.mapType === 'us' ? usCitiesData : citiesData;
-            const requestedCities = cityData.features.filter(city => 
-                mapData.cities.some(c => city.properties.NAME === c.name)
+            const requestedCities = citiesData.features.filter(city => 
+                mapData.cities.some(c => city.properties.NAME === c.name) &&
+                // For US maps, only show US cities
+                (mapData.mapType === 'us' ? city.properties.COUNTRY === 'United States' : true)
             );
             
             // City dots
