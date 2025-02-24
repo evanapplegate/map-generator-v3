@@ -27,6 +27,9 @@ mapContainer2.style.height = '400px';
 mapContainer3.style.width = '100%';
 mapContainer3.style.height = '400px';
 
+// Store map data for each container
+const mapDataStore = new Map();
+
 // Initialize app
 log('APP', 'Initializing application');
 
@@ -63,7 +66,7 @@ try {
             const req1Promise = generateMapData(description)
                 .then(async mapData => {
                     log('APP', 'First map data generated');
-                    currentMapData = mapData; // Store for first map's export
+                    mapDataStore.set(mapContainer1, mapData);
                     mapContainer1.innerHTML = 'Rendering...';
                     await renderMap(mapContainer1, mapData);
                     document.getElementById('export-buttons').style.display = 'flex';
@@ -76,6 +79,7 @@ try {
                 .then(() => generateMapData(description))
                 .then(async mapData => {
                     log('APP', 'Second map data generated');
+                    mapDataStore.set(mapContainer2, mapData);
                     mapContainer2.innerHTML = 'Rendering...';
                     await renderMap(mapContainer2, mapData);
                     document.getElementById('export-buttons2').style.display = 'flex';
@@ -88,20 +92,9 @@ try {
                 .then(() => generateMapData(description))
                 .then(async mapData => {
                     log('APP', 'Third map data generated');
+                    mapDataStore.set(mapContainer3, mapData);
                     mapContainer3.innerHTML = 'Rendering...';
                     await renderMap(mapContainer3, mapData);
-                    
-                    // Store mapData when exporting third map
-                    exportD3Button3.addEventListener('click', async () => {
-                        currentMapData = mapData;
-                        try {
-                            const bundle = await exportBundle(mapContainer3);
-                            downloadFile(bundle, 'map3-visualization.zip', 'application/zip');
-                        } catch (error) {
-                            log('APP', 'Error exporting bundle', { error: error.message });
-                        }
-                    }, { once: true });
-                    
                     document.getElementById('export-buttons3').style.display = 'flex';
                     exportSvgButton3.disabled = false;
                     exportD3Button3.disabled = false;
@@ -146,7 +139,9 @@ try {
     // Export D3 bundle on button click
     exportD3Button.addEventListener('click', async () => {
         try {
-            const bundle = await exportBundle(mapContainer1);
+            const mapData = mapDataStore.get(mapContainer1);
+            if (!mapData) throw new Error('No map data found');
+            const bundle = await exportBundle(mapContainer1, mapData);
             downloadFile(bundle, 'map-visualization.zip', 'application/zip');
         } catch (error) {
             log('APP', 'Error exporting bundle', { error: error.message });
@@ -155,8 +150,21 @@ try {
     
     exportD3Button2.addEventListener('click', async () => {
         try {
-            const bundle = await exportBundle(mapContainer2);
+            const mapData = mapDataStore.get(mapContainer2);
+            if (!mapData) throw new Error('No map data found');
+            const bundle = await exportBundle(mapContainer2, mapData);
             downloadFile(bundle, 'map2-visualization.zip', 'application/zip');
+        } catch (error) {
+            log('APP', 'Error exporting bundle', { error: error.message });
+        }
+    });
+    
+    exportD3Button3.addEventListener('click', async () => {
+        try {
+            const mapData = mapDataStore.get(mapContainer3);
+            if (!mapData) throw new Error('No map data found');
+            const bundle = await exportBundle(mapContainer3, mapData);
+            downloadFile(bundle, 'map3-visualization.zip', 'application/zip');
         } catch (error) {
             log('APP', 'Error exporting bundle', { error: error.message });
         }

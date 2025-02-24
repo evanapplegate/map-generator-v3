@@ -3,7 +3,6 @@
  */
 
 import { log } from './logger.js';
-import { currentMapData } from './main.js';
 
 /**
  * Load GeoJSON data
@@ -36,12 +35,10 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
             margin: 0;
             padding: 20px;
             font-family: Optima, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-            background: #ffffff;
         }
         #map { 
             width: 100%; 
             height: 800px;
-            background: #F9F5F1;
             border-radius: 4px;
         }
         .tooltip {
@@ -97,7 +94,7 @@ const svg = d3.select('#map')
     .attr('height', '100%')
     .attr('preserveAspectRatio', 'xMidYMid meet')
     .attr('viewBox', \`0 0 \${width} \${height}\`)
-    .style('background-color', '#F9F5F1');
+    .style('background-color', 'inherit');
 
 // Create layers
 const regionsLayer = svg.append('g').attr('id', 'regions-layer');
@@ -220,7 +217,16 @@ Promise.all([
     
     // Add country/state labels
     if (showLabels) {
-        const features = mapType === 'us' ? states.features : countries.features;
+        // For world maps, include both highlighted countries and states
+        const hasHighlightedStates = stateList?.some(s => 
+            /^[A-Z]{2}$/.test(s.postalCode) && highlightColors?.[s.postalCode]
+        );
+        
+        const features = mapType === 'us' ? states.features :
+            hasHighlightedStates ? 
+                [...countries.features.filter(f => f.properties.ISO_A3 !== 'USA'), ...states.features] :
+                countries.features;
+
         countryLabelsLayer.selectAll('text')
             .data(features)
             .join('text')
@@ -267,9 +273,10 @@ Promise.all([
 /**
  * Export D3 visualization as standalone bundle
  * @param {HTMLElement} container - Map container element
+ * @param {Object} mapData - Map configuration data
  * @returns {Promise<Blob>} Bundle as zip file
  */
-export async function exportBundle(container) {
+export async function exportBundle(container, mapData) {
     try {
         const zip = new JSZip();
         
@@ -283,21 +290,21 @@ export async function exportBundle(container) {
         const svg = container.querySelector('svg');
         if (!svg) throw new Error('No map found to export');
         
-        const mapData = {
+        const visualData = {
             width: container.clientWidth,
             height: container.clientHeight,
             svg: svg.outerHTML,
-            highlightColors: currentMapData.highlightColors,
-            defaultFill: currentMapData.defaultFill,
-            mapType: currentMapData.mapType,
-            labels: currentMapData.labels,
-            states: currentMapData.states,
-            cities: currentMapData.cities,
-            showLabels: currentMapData.showLabels,
-            borderColor: currentMapData.borderColor
+            highlightColors: mapData.highlightColors,
+            defaultFill: mapData.defaultFill,
+            mapType: mapData.mapType,
+            labels: mapData.labels,
+            states: mapData.states,
+            cities: mapData.cities,
+            showLabels: mapData.showLabels,
+            borderColor: mapData.borderColor
         };
         
-        src.file('visualization.js', generateVisualizationCode(mapData));
+        src.file('visualization.js', generateVisualizationCode(visualData));
         
         // Create src/geojson directory for GeoJSON files
         const geojsonDir = zip.folder('src/geojson');
@@ -377,7 +384,6 @@ Make sure the paths to the CSS and JavaScript files are correct relative to your
             #map { 
                 width: 100%;
                 height: 600px;
-                background: #F9F5F1;
                 border-radius: 4px;
             }
             .tooltip {

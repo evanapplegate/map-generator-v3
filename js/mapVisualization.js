@@ -231,7 +231,16 @@ export async function renderMap(container, mapData) {
         
         // Add country/state labels
         if (mapData.showLabels) {
-            const features = mapData.mapType === 'us' ? states.features : countries.features;
+            // For world maps, include both highlighted countries and states
+            const hasHighlightedStates = mapData.states?.some(s => 
+                /^[A-Z]{2}$/.test(s.postalCode) && mapData.highlightColors?.[s.postalCode]
+            );
+            
+            const features = mapData.mapType === 'us' ? states.features :
+                hasHighlightedStates ? 
+                    [...countries.features.filter(f => f.properties.ISO_A3 !== 'USA'), ...states.features] :
+                    countries.features;
+
             countryLabelsLayer.selectAll('text')
                 .data(features)
                 .join('text')
