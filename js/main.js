@@ -72,6 +72,10 @@ try {
                     document.getElementById('export-buttons').style.display = 'flex';
                     exportSvgButton.disabled = false;
                     exportD3Button.disabled = false;
+                })
+                .catch(error => {
+                    log('APP', 'Error generating first map', { error: error.message });
+                    mapContainer1.innerHTML = `Error: ${error.message}`;
                 });
 
             // Start second request after 3s delay
@@ -85,6 +89,10 @@ try {
                     document.getElementById('export-buttons2').style.display = 'flex';
                     exportSvgButton2.disabled = false;
                     exportD3Button2.disabled = false;
+                })
+                .catch(error => {
+                    log('APP', 'Error generating second map', { error: error.message });
+                    mapContainer2.innerHTML = `Error: ${error.message}`;
                 });
 
             // Start third request after 6s delay
@@ -98,10 +106,14 @@ try {
                     document.getElementById('export-buttons3').style.display = 'flex';
                     exportSvgButton3.disabled = false;
                     exportD3Button3.disabled = false;
+                })
+                .catch(error => {
+                    log('APP', 'Error generating third map', { error: error.message });
+                    mapContainer3.innerHTML = `Error: ${error.message}`;
                 });
 
-            // Wait for all to complete
-            await Promise.all([req1Promise, req2Promise, req3Promise]);
+            // Wait for all to complete, but don't throw errors since they're handled per-request
+            await Promise.allSettled([req1Promise, req2Promise, req3Promise]);
             
         } catch (error) {
             log('APP', 'Error generating map', { error: error.message });

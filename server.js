@@ -117,8 +117,8 @@ app.post('/api/claude', async (req, res) => {
                 'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
-                model: 'claude-3-5-haiku-20241022',
-                max_tokens: 1000,
+                model: 'claude-3-7-sonnet-latest',
+                max_tokens: 4000,
                 messages: [{
                     role: 'user',
                     content: description

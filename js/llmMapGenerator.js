@@ -45,6 +45,14 @@ FACT-FINDING:
 
 RESPOND ONLY WITH A VALID JSON OBJECT. NO OTHER TEXT OR FORMATTING.
 
+CRITICAL: You must respond with ONLY a valid JSON object. No explanations, no markdown, no code blocks.
+The JSON must be properly formatted with:
+- All property names in double quotes
+- No trailing commas
+- No comments
+- No line breaks in strings
+- Proper string escaping
+
 The JSON must follow this format:
 {
   "mapType": "world" | "us",
@@ -105,56 +113,38 @@ export async function generateMapData(description) {
             const data = await response.json();
             
             // Extract content from Claude's response
-            try {
-                const content = data.content[0].text;
-                const mapData = JSON.parse(content);
-                
-                // Validate response structure
-                if (!mapData.mapType || !mapData.states) {
-                    throw new Error('Invalid response structure from Claude');
-                }
-                
-                if (!['us', 'world'].includes(mapData.mapType)) {
-                    throw new Error('Invalid map type from Claude');
-                }
-                
-                if (!Array.isArray(mapData.states)) {
-                    throw new Error('States must be an array');
-                }
-                
-                for (const state of mapData.states) {
-                    if (!state.state || !state.postalCode || !state.label) {
-                        throw new Error('Missing required state fields');
-                    }
-                }
-                
-                if (!mapData.defaultFill || !mapData.highlightColors || !mapData.borderColor) {
-                    throw new Error('Missing required color fields');
-                }
-                
-                log('CLAUDE', 'Validated map data', mapData);
-                
-                // Force showLabels to true
-                mapData.showLabels = true;
-                
-                return mapData;
-                
-            } catch (parseError) {
-                log('CLAUDE', 'JSON parse error', { 
-                    error: parseError.message,
-                    content: data.content[0].text,
-                    attempt 
-                });
-                
-                if (attempt === MAX_RETRIES) {
-                    throw new Error(`Failed to parse Claude's response after ${MAX_RETRIES} attempts: ${parseError.message}`);
-                }
-                
-                // Wait before retrying
-                await sleep(RETRY_DELAY);
-                continue;
+            const content = data.content[0].text;
+            const mapData = JSON.parse(content);
+            
+            // Validate response structure
+            if (!mapData.mapType || !mapData.states) {
+                throw new Error('Invalid response structure from Claude');
             }
             
+            if (!['us', 'world'].includes(mapData.mapType)) {
+                throw new Error('Invalid map type from Claude');
+            }
+            
+            if (!Array.isArray(mapData.states)) {
+                throw new Error('States must be an array');
+            }
+            
+            for (const state of mapData.states) {
+                if (!state.state || !state.postalCode || !state.label) {
+                    throw new Error('Missing required state fields');
+                }
+            }
+            
+            if (!mapData.defaultFill || !mapData.highlightColors || !mapData.borderColor) {
+                throw new Error('Missing required color fields');
+            }
+            
+            log('CLAUDE', 'Validated map data', mapData);
+            
+            // Force showLabels to true
+            mapData.showLabels = true;
+            return mapData;
+
         } catch (error) {
             lastError = error;
             log('CLAUDE', 'Request error', { 
