@@ -1,7 +1,9 @@
 body {
     background-color: #F9F5F1;
     background-image: url('../images/background.gif');
-    background-repeat: repeat;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
     color: #8d7a69;
     font-family: Optima, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     margin: 0;
@@ -27,7 +29,7 @@ body {
 }
 
 #description {
-    height: 100px;
+    height: 430px;
     resize: vertical;
 }
 
@@ -94,6 +96,21 @@ textarea {
 .loading {
     opacity: 0.7;
     pointer-events: none;
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #c5b8ac;
+    border-top: 2px solid #8D7A69;
+    border-radius: 50%;
+    margin: 10px auto;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 header {

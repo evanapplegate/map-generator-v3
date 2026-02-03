@@ -24,5 +24,8 @@ export function log(type, action, data) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify(logEntry)
-    }).catch(err => console.error('Logging failed:', err));
+    }).catch(err => {
+        console.error('Logging failed:', err);
+        console.error('Failed log entry:', logEntry);
+    });
 }

@@ -2,6 +2,9 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -70,7 +73,7 @@ function log(type, action, data = {}) {
 }
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5000;
 
 // Force HTTPS
 app.enable('trust proxy');
@@ -117,13 +120,79 @@ app.post('/api/claude', async (req, res) => {
                 'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
-                model: 'claude-3-7-sonnet-latest',
+                model: 'claude-opus-4-5',
                 max_tokens: 4000,
                 messages: [{
                     role: 'user',
                     content: description
                 }],
-                system: req.body.system
+                system: [
+                    {
+                        type: "text",
+                        text: req.body.system,
+                        cache_control: { type: "ephemeral" }
+                    }
+                ],
+                tools: [
+                    {
+                        name: "render_map",
+                        description: "Render a map visualization based on user request",
+                        input_schema: {
+                            type: "object",
+                            properties: {
+                                mapType: {
+                                    type: "string",
+                                    enum: ["world", "us"],
+                                    description: "The type of map to render"
+                                },
+                                states: {
+                                    type: "array",
+                                    items: {
+                                        type: "object",
+                                        properties: {
+                                            state: { type: "string", description: "Full name of the state or country" },
+                                            postalCode: { type: "string", description: "2-letter state code or 3-letter ISO country code. CRITICAL: Never use 'USA' here for states." },
+                                            label: { type: "string", description: "Display label" }
+                                        },
+                                        required: ["state", "postalCode", "label"]
+                                    }
+                                },
+                                defaultFill: {
+                                    type: "string",
+                                    description: "Default hex color for non-highlighted regions"
+                                },
+                                highlightColors: {
+                                    type: "object",
+                                    additionalProperties: { type: "string" },
+                                    description: "Mapping of postalCode/ISO_A3 to hex color"
+                                },
+                                borderColor: {
+                                    type: "string",
+                                    description: "Hex color for borders"
+                                },
+                                showLabels: {
+                                    type: "boolean",
+                                    description: "Whether to show country and state labels. Set to false if the user says 'dont label countries' or similar."
+                                },
+                                cities: {
+                                    type: "array",
+                                    items: {
+                                        type: "object",
+                                        properties: {
+                                            name: { type: "string", description: "Name of the city" },
+                                            country: { type: "string", description: "Full name of the country where the city is located (for disambiguation)" },
+                                            isCapital: { type: "boolean", description: "Whether this city is a national capital" }
+                                        },
+                                        required: ["name", "country", "isCapital"]
+                                    },
+                                    description: "CRITICAL: You must include EVERY requested city and EVERY capital city for the requested groups (e.g. all 55 African Union capitals). Do not summarize or provide a partial list. Be exhaustive."
+                                }
+                            },
+                            required: ["mapType", "states", "defaultFill", "highlightColors", "borderColor", "showLabels", "cities"]
+                        }
+                    }
+                ],
+                tool_choice: { type: "tool", name: "render_map" }
             })
         });
         

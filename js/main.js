@@ -1,6 +1,7 @@
 import { generateMapData } from './llmMapGenerator.js';
 import { renderMap } from './mapVisualization.js';
 import { exportBundle } from './exportD3Bundle.js';
+import { exportPptx } from './exportPptx.js';
 import { log } from './logger.js';
 
 // Store current map data
@@ -13,10 +14,13 @@ const mapContainer3 = document.getElementById('map3');
 const generateButton = document.getElementById('generate');
 const descriptionInput = document.getElementById('description');
 const exportSvgButton = document.getElementById('export-svg');
+const exportPptxButton = document.getElementById('export-pptx');
 const exportD3Button = document.getElementById('export-d3');
 const exportSvgButton2 = document.getElementById('export-svg2');
+const exportPptxButton2 = document.getElementById('export-pptx2');
 const exportD3Button2 = document.getElementById('export-d3-2');
 const exportSvgButton3 = document.getElementById('export-svg3');
+const exportPptxButton3 = document.getElementById('export-pptx3');
 const exportD3Button3 = document.getElementById('export-d3-3');
 
 // Ensure map container has dimensions
@@ -29,6 +33,37 @@ mapContainer3.style.height = '400px';
 
 // Store map data for each container
 const mapDataStore = new Map();
+
+// Global error handlers for verbose logging
+window.addEventListener('error', (event) => {
+    const errorDetails = {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        error: event.error ? {
+            name: event.error.name,
+            message: event.error.message,
+            stack: event.error.stack
+        } : null
+    };
+    log('APP', 'Unhandled error', errorDetails);
+    console.error('UNHANDLED ERROR:', errorDetails);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    const errorDetails = {
+        reason: event.reason,
+        promise: event.promise,
+        error: event.reason instanceof Error ? {
+            name: event.reason.name,
+            message: event.reason.message,
+            stack: event.reason.stack
+        } : event.reason
+    };
+    log('APP', 'Unhandled promise rejection', errorDetails);
+    console.error('UNHANDLED PROMISE REJECTION:', errorDetails);
+});
 
 // Initialize app
 log('APP', 'Initializing application');
@@ -49,17 +84,20 @@ try {
             log('APP', 'Starting map generation', { description });
             
             // Clear containers and hide export buttons
-            mapContainer1.innerHTML = 'Generating first map...';
-            mapContainer2.innerHTML = 'Generating second map...';
-            mapContainer3.innerHTML = 'Generating third map...';
+            mapContainer1.innerHTML = 'Generating first map...<div class="spinner"></div>';
+            mapContainer2.innerHTML = 'Generating second map...<div class="spinner"></div>';
+            mapContainer3.innerHTML = 'Generating third map...<div class="spinner"></div>';
             document.getElementById('export-buttons').style.display = 'none';
             document.getElementById('export-buttons2').style.display = 'none';
             document.getElementById('export-buttons3').style.display = 'none';
             exportSvgButton.disabled = true;
+            exportPptxButton.disabled = true;
             exportD3Button.disabled = true;
             exportSvgButton2.disabled = true;
+            exportPptxButton2.disabled = true;
             exportD3Button2.disabled = true;
             exportSvgButton3.disabled = true;
+            exportPptxButton3.disabled = true;
             exportD3Button3.disabled = true;
             
             // Start first request immediately
@@ -67,10 +105,11 @@ try {
                 .then(async mapData => {
                     log('APP', 'First map data generated');
                     mapDataStore.set(mapContainer1, mapData);
-                    mapContainer1.innerHTML = 'Rendering...';
+                    mapContainer1.innerHTML = 'Rendering...<div class="spinner"></div>';
                     await renderMap(mapContainer1, mapData);
                     document.getElementById('export-buttons').style.display = 'flex';
                     exportSvgButton.disabled = false;
+                    exportPptxButton.disabled = false;
                     exportD3Button.disabled = false;
                 })
                 .catch(error => {
@@ -84,10 +123,11 @@ try {
                 .then(async mapData => {
                     log('APP', 'Second map data generated');
                     mapDataStore.set(mapContainer2, mapData);
-                    mapContainer2.innerHTML = 'Rendering...';
+                    mapContainer2.innerHTML = 'Rendering...<div class="spinner"></div>';
                     await renderMap(mapContainer2, mapData);
                     document.getElementById('export-buttons2').style.display = 'flex';
                     exportSvgButton2.disabled = false;
+                    exportPptxButton2.disabled = false;
                     exportD3Button2.disabled = false;
                 })
                 .catch(error => {
@@ -101,10 +141,11 @@ try {
                 .then(async mapData => {
                     log('APP', 'Third map data generated');
                     mapDataStore.set(mapContainer3, mapData);
-                    mapContainer3.innerHTML = 'Rendering...';
+                    mapContainer3.innerHTML = 'Rendering...<div class="spinner"></div>';
                     await renderMap(mapContainer3, mapData);
                     document.getElementById('export-buttons3').style.display = 'flex';
                     exportSvgButton3.disabled = false;
+                    exportPptxButton3.disabled = false;
                     exportD3Button3.disabled = false;
                 })
                 .catch(error => {
@@ -146,6 +187,31 @@ try {
         
         const svgData = new XMLSerializer().serializeToString(svg);
         downloadFile(svgData, 'map3.svg', 'image/svg+xml');
+    });
+
+    // Export PPTX on button click
+    exportPptxButton.addEventListener('click', async () => {
+        try {
+            await exportPptx(mapContainer1, 'map.pptx');
+        } catch (error) {
+            log('APP', 'Error exporting PPTX', { error: error.message });
+        }
+    });
+
+    exportPptxButton2.addEventListener('click', async () => {
+        try {
+            await exportPptx(mapContainer2, 'map2.pptx');
+        } catch (error) {
+            log('APP', 'Error exporting PPTX', { error: error.message });
+        }
+    });
+
+    exportPptxButton3.addEventListener('click', async () => {
+        try {
+            await exportPptx(mapContainer3, 'map3.pptx');
+        } catch (error) {
+            log('APP', 'Error exporting PPTX', { error: error.message });
+        }
     });
     
     // Export D3 bundle on button click

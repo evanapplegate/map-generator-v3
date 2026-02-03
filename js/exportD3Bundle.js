@@ -201,7 +201,7 @@ function generateVisualizationCode(mapData) {
         .attr('d', path)
         .attr('fill', 'none')
         .attr('stroke', '#F9F5F1')
-        .attr('stroke-width', '1');
+        .attr('stroke-width', '0.5');
             
     // Draw state bounds in world view
     if (mapType === 'world' && hasHighlightedStates) {
@@ -211,7 +211,7 @@ function generateVisualizationCode(mapData) {
             .attr('d', path)
             .attr('fill', 'none')
             .attr('stroke', '#F9F5F1')
-            .attr('stroke-width', '1');
+            .attr('stroke-width', '0.5');
     }
 
     // Draw disputed bounds for world maps
@@ -222,7 +222,7 @@ function generateVisualizationCode(mapData) {
             .attr('d', path)
             .attr('fill', 'none')
             .attr('stroke', '#F9F5F1')
-            .attr('stroke-width', '1')
+            .attr('stroke-width', '0.5')
             .attr('stroke-dasharray', '1,1');
     }
 
@@ -238,15 +238,35 @@ function generateVisualizationCode(mapData) {
             })
         );
             
-        // City dots
+        // City markers (dots or stars)
+        // Regular dots
         cityDotsLayer.selectAll('circle')
-            .data(requestedCities)
+            .data(requestedCities.filter(d => !d.isCapital))
             .join('circle')
             .attr('cx', d => projection(d.geometry.coordinates)[0])
             .attr('cy', d => projection(d.geometry.coordinates)[1])
             .attr('r', 1)
             .attr('fill', '#000')
             .attr('stroke', 'none');
+
+        // Capital stars
+        const starSize = 4;
+        const starPath = "M12.307,18.891c-.169.006-.338.055-.488.147l-6.84,4.209c-.019.011-.024.015-.047,0-.022-.011-.031-.038-.021-.06l1.86-7.85c.086-.363-.037-.745-.32-.989L.363,9.099c-.015-.012-.029-.024-.016-.062s.023-.034.041-.036l7.99-.645c.374-.032.698-.27.84-.618L12.296.286c.01-.021.014-.031.044-.031h.004c.03,0,.034.01.044.031l3.078,7.451c.142.347.466.585.84.618l7.99.645c.019.003.029-.002.041.036s-.001.05-.016.062l-6.088,5.25c-.283.244-.406.625-.32.989l1.86,7.85c.01.022,0,.049-.021.06-.024.015-.029.011-.047,0l-6.84-4.209c-.15-.092-.319-.142-.489-.148h-.067Z";
+        const starOriginalWidth = 24.69;
+        const starScale = starSize / starOriginalWidth;
+
+        cityDotsLayer.selectAll('path.capital-star')
+            .data(requestedCities.filter(d => d.isCapital))
+            .join('path')
+            .attr('class', 'capital-star')
+            .attr('d', starPath)
+            .attr('fill', '#000')
+            .attr('stroke', 'none')
+            .attr('transform', d => {
+                const coords = projection(d.geometry.coordinates);
+                if (!coords) return 'translate(0,0)';
+                return \`translate(\${coords[0] - starSize / 2}, \${coords[1] - starSize / 2}) scale(\${starScale})\`;
+            });
                
         // City labels
         cityLabelsLayer.selectAll('text')
@@ -255,7 +275,7 @@ function generateVisualizationCode(mapData) {
             .attr('x', d => projection(d.geometry.coordinates)[0] + 3)
             .attr('y', d => projection(d.geometry.coordinates)[1])
             .text(d => d.properties.NAME)
-            .attr('font-size', '8px')
+                .attr('font-size', '6pt')
             .attr('fill', '#000000')
             .style('font-weight', 'normal');
     }
@@ -278,7 +298,7 @@ function generateVisualizationCode(mapData) {
                 return highlightColors[code] ? (d.properties.name || d.properties.NAME) : '';
             })
             .attr('text-anchor', 'middle')
-            .attr('font-size', '8px')
+                .attr('font-size', '6pt')
             .attr('fill', '#000000')
             .style('font-weight', 'bold')
             .style('display', d => {
