@@ -26,7 +26,8 @@ function smartMatch(requested, actual, isCountry = false) {
         'sf': 'san francisco',
         'dc': 'washington',
         'washington dc': 'washington',
-        'sao paolo': 'sao paulo'
+        'sao paolo': 'sao paulo',
+        'macao': 'macau'  // Normalize Macao -> Macau spelling
     };
     
     // Common Country Aliases
@@ -36,7 +37,8 @@ function smartMatch(requested, actual, isCountry = false) {
         'united states': 'united states of america',
         'uk': 'united kingdom',
         'uae': 'united arab emirates',
-        'east timor': 'timor-leste'
+        'east timor': 'timor-leste',
+        'macao': 'macau'  // Normalize Macao -> Macau spelling
     };
 
     const mappedR = cityAliases[r] || countryAliases[r] || r;
@@ -46,12 +48,12 @@ function smartMatch(requested, actual, isCountry = false) {
 
     // For countries, allow partial matches (e.g., "United States" in "United States of America")
     if (isCountry) {
-        // Special case: Hong Kong and Macao should NOT match "China" or each other via partial match
-        const specialEntities = ['hong kong', 'macao', 'china', 'hong kong s.a.r.', 'macao s.a.r.'];
+        // Special case: Hong Kong and Macau should NOT match "China" or each other via partial match
+        const specialEntities = ['hong kong', 'macau', 'china', 'hong kong s.a.r.', 'hong kong s.a.r', 'macau s.a.r.', 'macau s.a.r'];
         if (specialEntities.includes(mappedR) || specialEntities.includes(mappedA)) {
-            // Handle S.A.R. variations
-            const normR = mappedR.replace(' s.a.r.', '');
-            const normA = mappedA.replace(' s.a.r.', '');
+            // Handle S.A.R. variations (with or without period)
+            const normR = mappedR.replace(/ s\.a\.r\.?$/i, '');
+            const normA = mappedA.replace(/ s\.a\.r\.?$/i, '');
             return normR === normA;
         }
         return mappedA.includes(mappedR) || mappedR.includes(mappedA);

@@ -23,15 +23,16 @@ AVAILABLE GEOJSON FILES AND THEIR FIELDS:
    - CRITICAL: Handle common abbreviations. For example, "NYC" or "New York City" should be mapped to name: "New York City" and country: "United States of America".
    - CRITICAL: For the US capital, use name: "Washington" and country: "United States of America". Do NOT use "Washington, D.C." or "Washington DC".
    - CRITICAL: For the UK capital, use name: "London" and country: "United Kingdom". Do NOT use "UK" or "Great Britain".
-   - CRITICAL: For Hong Kong, use name: "Hong Kong" and country: "China". The renderer will handle the mapping to "Hong Kong S.A.R.".
-   - CRITICAL: For Macao, use name: "Macao" and country: "China". The renderer will handle the mapping to "Macao S.A.R.".
-   - IMPORTANT: Hong Kong (HKG) and Macao (MAC) are separate entities. If asked for one, do NOT include the other unless explicitly requested.
+   - CRITICAL: Hong Kong and Macau are CITIES, not countries. They are part of China.
+   - CRITICAL: For Hong Kong city, use name: "Hong Kong" and country: "Hong Kong". This matches the cities.geojson ADM0NAME of "Hong Kong S.A.R.".
+   - CRITICAL: For Macao/Macau city, use name: "Macau" and country: "Macau". This matches the cities.geojson ADM0NAME of "Macau S.A.R".
+   - CRITICAL: If user asks to "highlight Hong Kong's country" or "color Hong Kong's parent country", highlight China (CHN).
    - CRITICAL: For Timor-Leste/East Timor, use name: "Dili" (or other cities) and country: "Timor-Leste". The ISO_A3 code is "TLS".
 
 REGION HANDLING:
 - For world maps: The renderer will automatically show US state boundaries (strokes) if you highlight the "USA" or mention US cities.
 - IMPORTANT: Only put actual US states (like "Texas", "California") into the "states" array. Do NOT put the "United States" or "USA" into the "states" array.
-- IMPORTANT: Hong Kong (HKG) and Macao (MAC) are separate entities in countries.geojson. If asked to color "China," you should also explicitly color HKG and MAC if you want them to match. However, if the user only asks for "Hong Kong", do NOT color Macao.
+- IMPORTANT: Hong Kong and Macau are NOT separate countries in the GeoJSON - they are part of China. To label them, use the cities array with a dot marker. To highlight their territory, highlight China (CHN).
 - For US-only maps: Use mapType: "us". Only include states, no countries.
 - LABELING: The "showLabels" field controls country and state labels. If the user says "dont label countries" or "only label cities", you MUST set "showLabels" to false.
 
@@ -271,27 +272,27 @@ Output: Call render_map with:
 "states": [],
 "defaultFill": "#edded1",
 "highlightColors": {
-"CHN": "#edded1",
-"HKG": "#edded1",
-"MAC": "#edded1"
+"CHN": "#edded1"
 },
 "borderColor": "#ffffff",
 "showLabels": true,
 "cities": []
 }
 
-User: "highlight Hong Kong"
+User: "label Hong Kong and highlight its parent country in blue"
 Output: Call render_map with:
 {
 "mapType": "world",
 "states": [],
 "defaultFill": "#edded1",
 "highlightColors": {
-"HKG": "#edded1"
+"CHN": "#89a9cc"
 },
 "borderColor": "#ffffff",
 "showLabels": true,
-"cities": []
+"cities": [
+{"name": "Hong Kong", "country": "Hong Kong", "isCapital": false}
+]
 }
 
 User: "highlight the US and China"
@@ -302,9 +303,7 @@ Output: Call render_map with:
 "defaultFill": "#edded1",
 "highlightColors": {
 "USA": "#edded1",
-"CHN": "#edded1",
-"HKG": "#edded1",
-"MAC": "#edded1"
+"CHN": "#edded1"
 },
 "borderColor": "#ffffff",
 "showLabels": true,
@@ -321,7 +320,7 @@ Output: Call render_map with:
 "borderColor": "#ffffff",
 "showLabels": true,
 "cities": [
-{"name": "Hong Kong", "country": "China", "isCapital": false}
+{"name": "Hong Kong", "country": "Hong Kong", "isCapital": false}
 ]
 }
 
