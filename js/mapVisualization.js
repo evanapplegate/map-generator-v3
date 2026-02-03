@@ -312,7 +312,7 @@ tooltip.style('visibility', 'hidden');
 
         // Add cities and labels
         if (mapData.cities) {
-            const requestedCities = citiesData.features.filter(city => 
+            let requestedCities = citiesData.features.filter(city => 
                 mapData.cities.some(c => {
                     // Use smartMatch for both name and country
                     const nameMatches = smartMatch(c.name, city.properties.NAME, false);
@@ -336,6 +336,61 @@ tooltip.style('visibility', 'hidden');
                     isCapital: cityConfig ? cityConfig.isCapital : false
                 };
             });
+
+            // Deduplicate capitals: Ensure only one capital per US state
+            if ((mapData.mapType === 'us' || shouldShowUSStates) && states?.features) {
+                const capitals = requestedCities.filter(c => c.isCapital);
+                const nonCapitals = requestedCities.filter(c => !c.isCapital);
+                const capitalsByState = {};
+                const unmappedCapitals = [];
+
+                // Map capitals to states
+                capitals.forEach(city => {
+                    const coords = city.geometry.coordinates;
+                    const state = states.features.find(s => d3.geoContains(s, coords));
+                    if (state) {
+                        const stateName = state.properties.name;
+                        if (!capitalsByState[stateName]) capitalsByState[stateName] = [];
+                        capitalsByState[stateName].push(city);
+                    } else {
+                        unmappedCapitals.push(city);
+                    }
+                });
+
+                const filteredCapitals = [...unmappedCapitals];
+
+                // Resolve conflicts
+                Object.entries(capitalsByState).forEach(([stateName, candidates]) => {
+                    if (candidates.length === 1) {
+                        filteredCapitals.push(candidates[0]);
+                    } else {
+                        // Count occurrences of each name in the full set to find "uniqueness"
+                        const nameCounts = {};
+                        requestedCities.forEach(c => {
+                            const name = c.properties.NAME;
+                            nameCounts[name] = (nameCounts[name] || 0) + 1;
+                        });
+
+                        // Sort by frequency (lowest first) -> most unique name wins
+                        candidates.sort((a, b) => {
+                            const countA = nameCounts[a.properties.NAME] || 0;
+                            const countB = nameCounts[b.properties.NAME] || 0;
+                            return countA - countB;
+                        });
+
+                        const winner = candidates[0];
+                        filteredCapitals.push(winner);
+                        
+                        log('D3', 'Resolved capital conflict', {
+                            state: stateName,
+                            kept: winner.properties.NAME,
+                            dropped: candidates.slice(1).map(c => c.properties.NAME)
+                        });
+                    }
+                });
+
+                requestedCities = [...nonCapitals, ...filteredCapitals];
+            }
 
 // City markers (dots or stars)
 // Regular dots
@@ -367,8 +422,8 @@ if (!coords) return 'translate(0,0)';
 return `translate(${coords[0] - starSize / 2}, ${coords[1] - starSize / 2}) scale(${starScale})`;
 });
 
-// City labels
-cityLabelsLayer.selectAll('text')
+// City labels - initial render to measure bounding boxes
+const cityLabelElements = cityLabelsLayer.selectAll('text')
 .data(requestedCities)
 .join('text')
 .attr('x', d => projection(d.geometry.coordinates)[0] + 3)
@@ -378,6 +433,77 @@ cityLabelsLayer.selectAll('text')
 .attr('font-size', '6pt')
 .attr('fill', '#000000')
 .style('font-weight', 'normal');
+
+// Prepare data for label collision avoidance
+const cityLabelData = [];
+const cityAnchorData = [];
+
+cityLabelElements.each(function(d, i) {
+    const bbox = this.getBBox();
+    const coords = projection(d.geometry.coordinates);
+    if (coords) {
+        // Tight gap from marker
+        const gap = 0;
+        const markerR = d.isCapital ? 2 : 1; 
+        const offset = (gap + markerR) * 0.8; // Tight horizontal spacing
+        
+        // Use fixed vertical offsets for 6pt font to ensure tightness without overlap
+        // 6pt font is approx 8px high (6px ascent + 2px descent)
+        // Marker is approx 4px high (extends 2px up/down)
+        
+        // Baseline 4px above center -> Bottom of text (descent) is at ~2px above center (touching top of marker)
+        const aboveY = coords[1] - 4; 
+        
+        // Baseline 8px below center -> Top of text (ascent) is at ~2px below center (touching bottom of marker)
+        const belowY = coords[1] + 8;
+        
+        // 8 candidate positions with consistent distance from marker
+        const candidatePositions = [
+            // Horizontal: label baseline aligned with marker
+            { x: coords[0] + offset + 1, y: coords[1] + 3 },                        // right (baseline shifted down slightly to center vertically)
+            { x: coords[0] - bbox.width - offset - 1, y: coords[1] + 3 },           // left
+            // Above marker
+            { x: coords[0] + offset, y: aboveY },                                   // top-right
+            { x: coords[0] - bbox.width - offset, y: aboveY },                      // top-left
+            { x: coords[0] - bbox.width / 2, y: aboveY },                           // centered above
+            // Below marker  
+            { x: coords[0] + offset, y: belowY },                                   // bottom-right
+            { x: coords[0] - bbox.width - offset, y: belowY },                      // bottom-left
+            { x: coords[0] - bbox.width / 2, y: belowY }                            // centered below
+        ];
+        
+        cityLabelData.push({
+            x: candidatePositions[0].x,
+            y: candidatePositions[0].y,
+            width: bbox.width,
+            height: bbox.height,
+            name: d.properties.NAME,
+            candidates: candidatePositions
+        });
+        cityAnchorData.push({
+            x: coords[0],
+            y: coords[1],
+            r: d.isCapital ? 4 : 2,
+            // Store marker bbox to prevent self-overlap
+            bbox: {
+                x: coords[0] - (d.isCapital ? 4 : 2),
+                y: coords[1] - (d.isCapital ? 4 : 2),
+                width: (d.isCapital ? 8 : 4),
+                height: (d.isCapital ? 8 : 4)
+            }
+        });
+    }
+});
+
+// Will collect state/country label bounding boxes after they are rendered
+// Store for later use in collision detection
+container._pendingCityLabels = {
+    labelData: cityLabelData,
+    anchorData: cityAnchorData,
+    elements: cityLabelElements,
+    width: width,
+    height: height
+};
 }
 
         // Add country/state labels
@@ -430,6 +556,116 @@ cityLabelsLayer.selectAll('text')
                 
                 return mapData.showLabels && (isHighlighted || hasCustomLabel) && !isNaN(centroid[0]) && !isNaN(centroid[1]) ? 'block' : 'none';
             });
+
+        // Run label collision avoidance after all labels are rendered
+        if (container._pendingCityLabels && container._pendingCityLabels.labelData.length > 0) {
+            const { labelData, anchorData, elements, width, height } = container._pendingCityLabels;
+            
+            // Collect fixed anchors (state/country labels that are visible)
+            const fixedAnchors = [];
+            countryLabelsLayer.selectAll('text').each(function() {
+                const el = d3.select(this);
+                if (el.style('display') !== 'none' && el.text()) {
+                    const bbox = this.getBBox();
+                    fixedAnchors.push({
+                        x: bbox.x,
+                        y: bbox.y,
+                        width: bbox.width,
+                        height: bbox.height
+                    });
+                }
+            });
+            
+            // Only run labeler if we have city labels
+            if (labelData.length > 0) {
+                try {
+                    // Smart placement: for each label, try all candidate positions
+                    // and pick the one with lowest overlap with fixed anchors
+                    labelData.forEach((lab, idx) => {
+                        if (lab.candidates && lab.candidates.length > 0) {
+                            let bestPos = lab.candidates[0];
+                            let bestScore = Infinity;
+                            
+                            lab.candidates.forEach((pos, posIdx) => {
+                                let score = 0;
+                                const labRect = {
+                                    x1: pos.x,
+                                    y1: pos.y - lab.height,
+                                    x2: pos.x + lab.width,
+                                    y2: pos.y
+                                };
+                                
+                                // Heavily penalize overlap with fixed anchors (state labels)
+                                fixedAnchors.forEach(fa => {
+                                    const faRect = {
+                                        x1: fa.x,
+                                        y1: fa.y,
+                                        x2: fa.x + fa.width,
+                                        y2: fa.y + fa.height
+                                    };
+                                    const xOverlap = Math.max(0, Math.min(labRect.x2, faRect.x2) - Math.max(labRect.x1, faRect.x1));
+                                    const yOverlap = Math.max(0, Math.min(labRect.y2, faRect.y2) - Math.max(labRect.y1, faRect.y1));
+                                    score += xOverlap * yOverlap * 100; // High penalty
+                                });
+                                
+                                // Light penalty for overlap with other city labels
+                                labelData.forEach((other, otherIdx) => {
+                                    if (otherIdx !== idx && otherIdx < idx) { // Only check already-placed labels
+                                        const otherRect = {
+                                            x1: other.x,
+                                            y1: other.y - other.height,
+                                            x2: other.x + other.width,
+                                            y2: other.y
+                                        };
+                                        const xOverlap = Math.max(0, Math.min(labRect.x2, otherRect.x2) - Math.max(labRect.x1, otherRect.x1));
+                                        const yOverlap = Math.max(0, Math.min(labRect.y2, otherRect.y2) - Math.max(labRect.y1, otherRect.y1));
+                                        score += xOverlap * yOverlap * 5; // Low penalty
+                                    }
+                                });
+                                
+                                // Penalize "centered above" (idx 4) and "centered below" (idx 7) positions
+                                // These place labels directly above/below which looks worse
+                                if (posIdx === 4 || posIdx === 7) {
+                                    score += 50; // Discourage these positions
+                                }
+                                
+                                // Small penalty for distance from marker
+                                const dx = pos.x + lab.width / 2 - anchorData[idx].x;
+                                const dy = pos.y - lab.height / 2 - anchorData[idx].y;
+                                score += Math.sqrt(dx * dx + dy * dy) * 0.5; // Increased penalty for distance
+                                
+                                if (score < bestScore) {
+                                    bestScore = score;
+                                    bestPos = pos;
+                                }
+                            });
+                            
+                            lab.x = bestPos.x;
+                            lab.y = bestPos.y;
+                        }
+                    });
+                    
+                    // Update city label positions
+                    elements.each(function(d, i) {
+                        if (labelData[i]) {
+                            d3.select(this)
+                                .attr('x', labelData[i].x)
+                                .attr('y', labelData[i].y);
+                        }
+                    });
+                    
+                    log('D3', 'Label collision avoidance complete', { 
+                        cityLabels: labelData.length,
+                        fixedAnchors: fixedAnchors.length
+                    });
+                } catch (err) {
+                    log('D3', 'Label collision avoidance error', { error: err.message });
+                }
+            }
+            
+            // Clean up
+            delete container._pendingCityLabels;
+        }
 
 log('D3', 'Map render complete');
 } catch (error) {
