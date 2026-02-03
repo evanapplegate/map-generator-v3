@@ -637,11 +637,13 @@ container._pendingCityLabels = {
                                 if (score < bestScore) {
                                     bestScore = score;
                                     bestPos = pos;
+                                    bestPosIdx = posIdx;
                                 }
                             });
                             
                             lab.x = bestPos.x;
                             lab.y = bestPos.y;
+                            lab.posIdx = bestPosIdx;
                         }
                     });
                     
@@ -650,7 +652,8 @@ container._pendingCityLabels = {
                         if (labelData[i]) {
                             d3.select(this)
                                 .attr('x', labelData[i].x)
-                                .attr('y', labelData[i].y);
+                                .attr('y', labelData[i].y)
+                                .attr('data-pos-idx', labelData[i].posIdx);
                         }
                     });
                     

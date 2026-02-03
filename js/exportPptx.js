@@ -64,18 +64,15 @@ export async function exportPptx(container, filename = 'map.pptx') {
             // Parse font size (assume pt if not specified, or px)
             // Override user preference to enforce 6pt for PPTX
             let fontSize = 6;
-            /* 
-            let fontSize = 10;
-            if (fontSizeStr.endsWith('pt')) {
-                fontSize = parseFloat(fontSizeStr);
-            } else if (fontSizeStr.endsWith('px')) {
-                // Convert px to pt (1px = 0.75pt approx)
-                fontSize = parseFloat(fontSizeStr) * 0.75;
-            } else {
-                fontSize = parseFloat(fontSizeStr);
+            
+            let posIdx = null;
+            if (textNode.hasAttribute('data-pos-idx')) {
+                const val = textNode.getAttribute('data-pos-idx');
+                if (val !== null && val !== '' && val !== 'undefined') {
+                    posIdx = parseInt(val, 10);
+                }
             }
-            */
-
+            
             textElements.push({
                 text: content,
                 x,
@@ -84,7 +81,8 @@ export async function exportPptx(container, filename = 'map.pptx') {
                 fontSize,
                 fontFamily,
                 color: fill,
-                bold: fontWeight === 'bold'
+                bold: fontWeight === 'bold',
+                posIdx
             });
             
             // Remove text from SVG
@@ -148,52 +146,80 @@ export async function exportPptx(container, filename = 'map.pptx') {
             if (item.textAnchor === 'middle') align = 'center';
             if (item.textAnchor === 'end') align = 'right';
             
-            // Calculate position
-            // SVG text y is baseline. PPTX y is top-left.
-            // We shift y up by approx font height to align baseline.
+            // PPTX text boxes have internal padding that pushes text away from the edge.
+            // We need to aggressively pull them back towards the marker.
             // 1 pt = 1/72 inch.
             const fontSizeInches = item.fontSize / 72;
             
             // Calculate PPTX coordinates
-            // Note: coordinates in SVG are relative to viewBox min-x/min-y
-            // If viewBox starts at 0,0, then just scale.
-            // If not, subtract vbX/vbY.
             const pptxX = ((item.x - vbX) * scale) + offsetX;
             const pptxY = ((item.y - vbY) * scale) + offsetY;
             
-            // Adjust Y to account for baseline vs top alignment
-            // A rough approximation is shifting up by 0.75 * fontSize
-            const adjustedY = pptxY - (fontSizeInches * 0.75);
-
-            // Determine width/position based on alignment
-            // Estimate text width in inches (approx 0.5 of font size per char)
-            const estimatedWidth = (item.text.length * item.fontSize * 0.5) / 72;
-            const boxW = estimatedWidth + 0.1; // Add small buffer
-            
+            // Aggressive adjustments to force labels closer to markers in PPTX
             let boxX = pptxX;
+            let adjustedY = pptxY;
+
+            // Estimate text width in inches (approx 0.6 of font size per char for Optima)
+            const estimatedWidth = (item.text.length * item.fontSize * 0.6) / 72;
+            const boxW = estimatedWidth;
+
+            // Determine "visual" alignment relative to marker based on D3 position index
+            // 0, 2, 5: Label is to the Right of marker (Standard)
+            // 1, 3, 6: Label is to the Left of marker
+            // 4, 7: Label is Centered
             
-            if (align === 'center') {
-                boxX = pptxX - (boxW / 2);
-            } else if (align === 'right') {
-                boxX = pptxX - boxW;
+            if (item.posIdx !== null && !isNaN(item.posIdx)) {
+                const isRightSideLabel = [0, 2, 5].includes(item.posIdx);
+                const isLeftSideLabel = [1, 3, 6].includes(item.posIdx);
+
+                if (isRightSideLabel) {
+                    // Label is to the RIGHT of marker.
+                    // Text starts near marker.
+                    // Pull Left (Decrease X) to move closer to marker.
+                    boxX = pptxX - 0.2; 
+                    
+                    // SVG baseline is at bottom, PPTX top is at top. Shift up to align.
+                    adjustedY = pptxY - (fontSizeInches * 0.8);
+                } else if (isLeftSideLabel) {
+                    // Label is to the LEFT of marker.
+                    // Text starts far left. Text ENDs near marker.
+                    // Pull Right (Increase X) to move closer to marker.
+                    boxX = pptxX + 0.2; 
+                    
+                    adjustedY = pptxY - (fontSizeInches * 0.8);
+                } else {
+                    // Center aligned (above/below)
+                    boxX = pptxX;
+                    adjustedY = pptxY - (fontSizeInches * 0.5);
+                }
             } else {
-                // left align
-                boxX = pptxX;
+                // State/Country label (no posIdx)
+                // Use default positioning based on text-anchor
+                if (align === 'center') {
+                    boxX = pptxX - (boxW / 2);
+                } else if (align === 'right') {
+                    boxX = pptxX - boxW;
+                } else {
+                    boxX = pptxX;
+                }
+                
+                // Standard baseline adjustment for labels without D3 collision data
+                adjustedY = pptxY - (fontSizeInches * 0.75);
             }
 
             slide.addText(item.text, {
                 x: boxX,
                 y: adjustedY,
-                w: boxW,
-                h: fontSizeInches * 1.2, // Tighter height
+                w: boxW + 0.2, // Extra width to prevent premature wrapping due to padding
+                h: fontSizeInches * 1.5,
                 fontSize: item.fontSize,
-                fontFace: 'Optima', // Enforce Optima as requested
+                fontFace: 'Optima',
                 color: item.color.replace('#', ''),
                 bold: item.bold,
                 align: align,
                 valign: 'top',
                 margin: 0,
-                wrap: false // Prevent wrapping
+                wrap: false
             });
         });
 
