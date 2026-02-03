@@ -42,13 +42,6 @@ export async function exportPptx(container, filename = 'map.pptx') {
         const slideWidth = 10;
         const slideHeight = 5.625;
         
-        // Calculate scale to fit slide while maintaining aspect ratio
-        const scale = Math.min(slideWidth / vbW, slideHeight / vbH);
-        
-        // Calculate offset to center the map
-        const offsetX = (slideWidth - (vbW * scale)) / 2;
-        const offsetY = (slideHeight - (vbH * scale)) / 2;
-
         // Extract text elements
         const textElements = [];
         const texts = svg.querySelectorAll('text');
@@ -106,7 +99,40 @@ export async function exportPptx(container, filename = 'map.pptx') {
         const pres = new PptxGenJS();
         const slide = pres.addSlide();
         
+        // Add grey ribbon at the top
+        const ribbonHeight = 0.3 * 1.3; // Increase height by 30%
+        slide.addShape(pres.ShapeType.rect, {
+            x: 0,
+            y: 0,
+            w: slideWidth,
+            h: ribbonHeight,
+            fill: { color: 'EFEFEF' } // Light grey
+        });
+
+        // Add "Your Map" text on the ribbon
+        // Move label down 5px from original (was 10px, now moved up 5px)
+        slide.addText('Right click your map > “Convert to Shape” to edit it further', {
+            x: 0.2,
+            y: 0.05 + (5 / 72),
+            w: 8,
+            h: 0.2,
+            fontSize: 10,
+            fontFace: 'Optima',
+            color: '333333',
+            bold: true,
+            align: 'left',
+            valign: 'middle'
+        });
+        
         // Add SVG image (now without text)
+        // Cap total map height to 80% of slide
+        const maxMapHeight = slideHeight * 0.9;
+        const scale = Math.min(slideWidth / vbW, maxMapHeight / vbH);
+        
+        // Calculate offset to center the map
+        const offsetX = (slideWidth - (vbW * scale)) / 2;
+        const offsetY = ((slideHeight - (vbH * scale)) / 2) + 0.15; // Shift down slightly for ribbon
+
         slide.addImage({
             data: svgBase64,
             x: offsetX,

@@ -46,6 +46,14 @@ function smartMatch(requested, actual, isCountry = false) {
 
     // For countries, allow partial matches (e.g., "United States" in "United States of America")
     if (isCountry) {
+        // Special case: Hong Kong and Macao should NOT match "China" or each other via partial match
+        const specialEntities = ['hong kong', 'macao', 'china', 'hong kong s.a.r.', 'macao s.a.r.'];
+        if (specialEntities.includes(mappedR) || specialEntities.includes(mappedA)) {
+            // Handle S.A.R. variations
+            const normR = mappedR.replace(' s.a.r.', '');
+            const normA = mappedA.replace(' s.a.r.', '');
+            return normR === normA;
+        }
         return mappedA.includes(mappedR) || mappedR.includes(mappedA);
     }
 
@@ -396,7 +404,16 @@ cityLabelsLayer.selectAll('text')
             })
             .text(d => {
                 const code = d.properties.postal || d.properties.ISO_A3;
-                return mapData.highlightColors[code] ? (d.properties.name || d.properties.NAME) : '';
+                // Prioritize the custom label from the LLM (e.g. "CA")
+                const label = mapData.states?.find(s => s.postalCode === code)?.label;
+                
+                // If the state is highlighted, show the label
+                if (mapData.highlightColors && mapData.highlightColors[code]) {
+                    return label || d.properties.name || d.properties.NAME;
+                }
+                
+                // If it's not highlighted, but we have a custom label (like the 50-state abbreviations request), show it
+                return label || '';
             })
             .attr('text-anchor', 'middle')
             .attr('font-family', 'Optima, sans-serif')
@@ -406,9 +423,12 @@ cityLabelsLayer.selectAll('text')
             .style('display', d => {
                 const code = d.properties.postal || d.properties.ISO_A3;
                 const centroid = path.centroid(d);
-                // Only show label if the country is highlighted AND showLabels is true
+                
+                // Show label if showLabels is true AND (it's highlighted OR it has a custom label)
                 const isHighlighted = mapData.highlightColors && mapData.highlightColors[code];
-                return mapData.showLabels && isHighlighted && !isNaN(centroid[0]) && !isNaN(centroid[1]) ? 'block' : 'none';
+                const hasCustomLabel = mapData.states?.some(s => s.postalCode === code && s.label);
+                
+                return mapData.showLabels && (isHighlighted || hasCustomLabel) && !isNaN(centroid[0]) && !isNaN(centroid[1]) ? 'block' : 'none';
             });
 
 log('D3', 'Map render complete');

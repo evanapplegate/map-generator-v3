@@ -25,12 +25,13 @@ AVAILABLE GEOJSON FILES AND THEIR FIELDS:
    - CRITICAL: For the UK capital, use name: "London" and country: "United Kingdom". Do NOT use "UK" or "Great Britain".
    - CRITICAL: For Hong Kong, use name: "Hong Kong" and country: "China". The renderer will handle the mapping to "Hong Kong S.A.R.".
    - CRITICAL: For Macao, use name: "Macao" and country: "China". The renderer will handle the mapping to "Macao S.A.R.".
+   - IMPORTANT: Hong Kong (HKG) and Macao (MAC) are separate entities. If asked for one, do NOT include the other unless explicitly requested.
    - CRITICAL: For Timor-Leste/East Timor, use name: "Dili" (or other cities) and country: "Timor-Leste". The ISO_A3 code is "TLS".
 
 REGION HANDLING:
 - For world maps: The renderer will automatically show US state boundaries (strokes) if you highlight the "USA" or mention US cities.
 - IMPORTANT: Only put actual US states (like "Texas", "California") into the "states" array. Do NOT put the "United States" or "USA" into the "states" array.
-- IMPORTANT: Hong Kong (HKG) and Macao (MAC) are separate entities in countries.geojson. If asked to color "China," you should also explicitly color HKG and MAC if you want them to match.
+- IMPORTANT: Hong Kong (HKG) and Macao (MAC) are separate entities in countries.geojson. If asked to color "China," you should also explicitly color HKG and MAC if you want them to match. However, if the user only asks for "Hong Kong", do NOT color Macao.
 - For US-only maps: Use mapType: "us". Only include states, no countries.
 - LABELING: The "showLabels" field controls country and state labels. If the user says "dont label countries" or "only label cities", you MUST set "showLabels" to false.
 
@@ -55,6 +56,69 @@ FACT-FINDING:
 - For US States: If asked for cities in a state, include all major ones requested.
 
 FEW-SHOT EXAMPLES:
+
+User: "USA map, label all states with 2-letter postal codes"
+Output: Call render_map with:
+{
+  "mapType": "us",
+  "states": [
+    {"state": "Alabama", "postalCode": "AL", "label": "AL"},
+    {"state": "Alaska", "postalCode": "AK", "label": "AK"},
+    {"state": "Arizona", "postalCode": "AZ", "label": "AZ"},
+    {"state": "Arkansas", "postalCode": "AR", "label": "AR"},
+    {"state": "California", "postalCode": "CA", "label": "CA"},
+    {"state": "Colorado", "postalCode": "CO", "label": "CO"},
+    {"state": "Connecticut", "postalCode": "CT", "label": "CT"},
+    {"state": "Delaware", "postalCode": "DE", "label": "DE"},
+    {"state": "Florida", "postalCode": "FL", "label": "FL"},
+    {"state": "Georgia", "postalCode": "GA", "label": "GA"},
+    {"state": "Hawaii", "postalCode": "HI", "label": "HI"},
+    {"state": "Idaho", "postalCode": "ID", "label": "ID"},
+    {"state": "Illinois", "postalCode": "IL", "label": "IL"},
+    {"state": "Indiana", "postalCode": "IN", "label": "IN"},
+    {"state": "Iowa", "postalCode": "IA", "label": "IA"},
+    {"state": "Kansas", "postalCode": "KS", "label": "KS"},
+    {"state": "Kentucky", "postalCode": "KY", "label": "KY"},
+    {"state": "Louisiana", "postalCode": "LA", "label": "LA"},
+    {"state": "Maine", "postalCode": "ME", "label": "ME"},
+    {"state": "Maryland", "postalCode": "MD", "label": "MD"},
+    {"state": "Massachusetts", "postalCode": "MA", "label": "MA"},
+    {"state": "Michigan", "postalCode": "MI", "label": "MI"},
+    {"state": "Minnesota", "postalCode": "MN", "label": "MN"},
+    {"state": "Mississippi", "postalCode": "MS", "label": "MS"},
+    {"state": "Missouri", "postalCode": "MO", "label": "MO"},
+    {"state": "Montana", "postalCode": "MT", "label": "MT"},
+    {"state": "Nebraska", "postalCode": "NE", "label": "NE"},
+    {"state": "Nevada", "postalCode": "NV", "label": "NV"},
+    {"state": "New Hampshire", "postalCode": "NH", "label": "NH"},
+    {"state": "New Jersey", "postalCode": "NJ", "label": "NJ"},
+    {"state": "New Mexico", "postalCode": "NM", "label": "NM"},
+    {"state": "New York", "postalCode": "NY", "label": "NY"},
+    {"state": "North Carolina", "postalCode": "NC", "label": "NC"},
+    {"state": "North Dakota", "postalCode": "ND", "label": "ND"},
+    {"state": "Ohio", "postalCode": "OH", "label": "OH"},
+    {"state": "Oklahoma", "postalCode": "OK", "label": "OK"},
+    {"state": "Oregon", "postalCode": "OR", "label": "OR"},
+    {"state": "Pennsylvania", "postalCode": "PA", "label": "PA"},
+    {"state": "Rhode Island", "postalCode": "RI", "label": "RI"},
+    {"state": "South Carolina", "postalCode": "SC", "label": "SC"},
+    {"state": "South Dakota", "postalCode": "SD", "label": "SD"},
+    {"state": "Tennessee", "postalCode": "TN", "label": "TN"},
+    {"state": "Texas", "postalCode": "TX", "label": "TX"},
+    {"state": "Utah", "postalCode": "UT", "label": "UT"},
+    {"state": "Vermont", "postalCode": "VT", "label": "VT"},
+    {"state": "Virginia", "postalCode": "VA", "label": "VA"},
+    {"state": "Washington", "postalCode": "WA", "label": "WA"},
+    {"state": "West Virginia", "postalCode": "WV", "label": "WV"},
+    {"state": "Wisconsin", "postalCode": "WI", "label": "WI"},
+    {"state": "Wyoming", "postalCode": "WY", "label": "WY"}
+  ],
+  "defaultFill": "#edded1",
+  "highlightColors": {},
+  "borderColor": "#ffffff",
+  "showLabels": true,
+  "cities": []
+}
 
 User: "mark all ASEAN countries green, label NYC and Tokyo, dont label countries"
 Output: Call render_map with:
@@ -194,6 +258,36 @@ Output: Call render_map with:
 "highlightColors": {
 "TX": "#b05856",
 "UT": "#89a9cc"
+},
+"borderColor": "#ffffff",
+"showLabels": true,
+"cities": []
+}
+
+User: "highlight China"
+Output: Call render_map with:
+{
+"mapType": "world",
+"states": [],
+"defaultFill": "#edded1",
+"highlightColors": {
+"CHN": "#edded1",
+"HKG": "#edded1",
+"MAC": "#edded1"
+},
+"borderColor": "#ffffff",
+"showLabels": true,
+"cities": []
+}
+
+User: "highlight Hong Kong"
+Output: Call render_map with:
+{
+"mapType": "world",
+"states": [],
+"defaultFill": "#edded1",
+"highlightColors": {
+"HKG": "#edded1"
 },
 "borderColor": "#ffffff",
 "showLabels": true,
