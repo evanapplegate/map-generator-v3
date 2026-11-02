@@ -20,7 +20,7 @@ An LLM-mediated map generator: describe a map in plain language, and get a vecto
 
 - **Node.js 20** — Runtime.
 - **Express** — Static file serving and API routes.
-- **Anthropic Claude API** — LLM calls are proxied through the server (`POST /api/claude`) so the API key stays in `CLAUDE_API_KEY` and is never exposed to the browser.
+- **Anthropic Claude API** — LLM calls are proxied through a Cloudflare Pages Function (`POST /api/claude`, `functions/api/claude.js`) so the API key stays in `CLAUDE_API_KEY` and is never exposed to the browser.
 - **Other** — `dotenv` (env vars), `compression`, `cors`. Logging to `logs/` (daily files, 7-day retention).
 
 ### Frontend
@@ -50,4 +50,4 @@ App runs at `http://localhost:5000` (or `PORT` from the environment). Open the p
 
 ## Deploy
 
-Set `CLAUDE_API_KEY` and `PORT` in your environment. The app uses `express.static` and a `Procfile`-style `npm start` (e.g. `web: node server.js`) so it’s suitable for Heroku or any Node host.
+Hosted on Cloudflare Pages. `npm run deploy` copies the site into `dist/` and uploads it with Wrangler. `CLAUDE_API_KEY` is a Pages secret (`npx wrangler pages secret put CLAUDE_API_KEY`), and the `RATE_LIMIT` KV namespace in `wrangler.toml` backs the limits in `functions/api/claude.js`.

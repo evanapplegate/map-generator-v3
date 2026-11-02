@@ -1,0 +1,7 @@
+name = "map-generator-v3"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-10-01"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "e1b49c5a8c874bbba354d53244f9edcb"
