@@ -56,7 +56,7 @@ button#generate {
     width: 100%;
 }
 
-#map-section, #map-section2, #map-section3 {
+#map-section, #map-section2 {
     border: 1px solid #c5b8ac;
     border-radius: 4px;
     padding: 20px;
@@ -71,7 +71,7 @@ button#generate {
     text-align: center;
 }
 
-#export-buttons, #export-buttons2, #export-buttons3 {
+#export-buttons, #export-buttons2 {
     margin-top: 20px;
     display: flex;
     gap: 10px;

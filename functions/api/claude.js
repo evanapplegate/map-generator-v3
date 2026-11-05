@@ -95,11 +95,14 @@ export async function onRequestPost({ request, env }) {
             headers: {
                 'Content-Type': 'application/json',
                 'x-api-key': env.CLAUDE_API_KEY,
-                'anthropic-version': '2023-06-01'
+                'anthropic-version': '2023-06-01',
+                'anthropic-beta': 'server-side-fallback-2026-07-01'
             },
             body: JSON.stringify({
-                model: 'claude-opus-4-5',
-                max_tokens: 4000,
+                model: 'claude-opus-5-5',
+                max_tokens: 16000,
+                fallbacks: 'default',
+                output_config: { effort: 'low' },
                 messages: [{
                     role: 'user',
                     content: description
@@ -107,12 +110,12 @@ export async function onRequestPost({ request, env }) {
                 system: [
                     {
                         type: "text",
-                        text: system,
+                        text: `${system}\n\nAlways respond by calling the render_map tool.`,
                         cache_control: { type: "ephemeral" }
                     }
                 ],
                 tools: [RENDER_MAP_TOOL],
-                tool_choice: { type: "tool", name: "render_map" }
+                tool_choice: { type: "auto" }
             })
         });
 
