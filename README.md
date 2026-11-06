@@ -18,10 +18,8 @@ An LLM-mediated map generator: describe a map in plain language, and get a vecto
 
 ### Backend
 
-- **Node.js 20** — Runtime.
-- **Express** — Static file serving and API routes.
+- **Cloudflare Pages** — Static file serving, plus one Pages Function.
 - **Anthropic Claude API** — LLM calls are proxied through a Cloudflare Pages Function (`POST /api/claude`, `functions/api/claude.js`) so the API key stays in `CLAUDE_API_KEY` and is never exposed to the browser.
-- **Other** — `dotenv` (env vars), `compression`, `cors`. Logging to `logs/` (daily files, 7-day retention).
 
 ### Frontend
 
@@ -36,17 +34,16 @@ An LLM-mediated map generator: describe a map in plain language, and get a vecto
 
 ### LLM flow
 
-- The server sends the user’s description to Claude with a long system prompt (map rules, color palette, region/city handling, few-shot examples) and a **tool**: `render_map` with a JSON schema. Claude is forced to respond with a single `render_map` call; that JSON is what the frontend uses to drive D3.
+- The Pages Function sends the user’s description to Claude Opus 5.5 with a long system prompt (map rules, color palette, region/city handling, few-shot examples) and a **tool**: `render_map` with a JSON schema. The prompt tells Claude to always respond with a `render_map` call; that JSON is what the frontend uses to drive D3. Each **Generate Map** makes two calls and shows two maps.
 
 ## Run locally
 
 ```bash
-npm install
-echo "CLAUDE_API_KEY=your_key" > .env
-npm start
+echo "CLAUDE_API_KEY=your_key" > .dev.vars
+npm run dev
 ```
 
-App runs at `http://localhost:5000` (or `PORT` from the environment). Open the page, type a map description, click **Generate Map**, then use the export buttons once a map is rendered.
+App runs at `http://localhost:8788`. Open the page, type a map description, click **Generate Map**, then use the export buttons once a map is rendered.
 
 ## Deploy
 

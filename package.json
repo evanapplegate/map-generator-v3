@@ -2,18 +2,9 @@
   "name": "map-generator",
   "version": "1.0.0",
   "type": "module",
-  "engines": {
-    "node": "20.x"
-  },
   "scripts": {
-    "start": "node server.js",
     "build": "rm -rf dist && mkdir dist && cp -R index.html background.gif og-image.jpg star.svg css geojson images js public/. dist/",
+    "dev": "npm run build && npx wrangler pages dev",
     "deploy": "npm run build && CLOUDFLARE_ACCOUNT_ID=ec1ae02e6ff5a4a2f4d19c9c315269c5 npx wrangler pages deploy --branch main"
-  },
-  "dependencies": {
-    "compression": "^1.7.4",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^4.21.2"
   }
 }
